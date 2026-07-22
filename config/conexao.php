@@ -4,7 +4,9 @@
 // =============================================================
 
 if (!defined('BASE_URL')) {
-    define('BASE_URL', '/restauranteSteelTeam');
+    $projetoRoot = dirname(__DIR__);
+    $docRoot     = rtrim($_SERVER['DOCUMENT_ROOT'], '/');
+    define('BASE_URL', rtrim(substr($projetoRoot, strlen($docRoot)), '/'));
 }
 
 $host = "localhost";

@@ -1,13 +1,7 @@
-# Ativa o módulo de reescrita
-RewriteEngine On
-
-# Bloqueia acesso à pasta config/
+# Proteção de pastas e headers de segurança
 <IfModule mod_rewrite.c>
+    RewriteEngine On
     RewriteRule ^config/ - [F,L]
-</IfModule>
-
-# Bloqueia acesso à pasta src/
-<IfModule mod_rewrite.c>
     RewriteRule ^src/ - [F,L]
 </IfModule>
 

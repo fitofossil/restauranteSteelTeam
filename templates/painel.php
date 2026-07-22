@@ -4,9 +4,8 @@
 // =============================================================
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../config/conexao.php';
+Auth::iniciarSessao();
 Auth::requireLogin();
-
-$conn = (require __DIR__ . '/../config/conexao.php');
 
 $mensagem = '';
 $tipoMensagem = '';

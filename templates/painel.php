@@ -1,18 +1,16 @@
 <?php
-session_start();
-
-if (empty($_SESSION['usuario'])) {
-    header('Location: ../telalogin/index.php');
-    exit();
-}
-
-require_once __DIR__ . '/../telalogin/conexao.php';
+// =============================================================
+// PAINEL ADMINISTRATIVO
+// =============================================================
+require_once __DIR__ . '/../src/Auth.php';
+require_once __DIR__ . '/../config/conexao.php';
+Auth::iniciarSessao();
+Auth::requireLogin();
 
 $mensagem = '';
 $tipoMensagem = '';
 
 try {
-    // Cria a tabela de pedidos na primeira abertura do painel.
     $conn->exec("CREATE TABLE IF NOT EXISTS pedidos (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         valor DECIMAL(10,2) NOT NULL,
@@ -24,25 +22,18 @@ try {
         if (isset($_POST['salvar_email'])) {
             $id = filter_input(INPUT_POST, 'usuario_id', FILTER_VALIDATE_INT);
             $email = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL);
-
-            if (!$id || !$email) {
-                throw new RuntimeException('Informe um e-mail válido.');
-            }
-
-            $stmt = $conn->prepare('UPDATE users_login SET email = ? WHERE id = ?');
-            $stmt->execute([$email, $id]);
+            if (!$id || !$email) throw new RuntimeException('Informe um e-mail válido.');
+            $stmt = $conn->prepare('UPDATE users_login SET email = :email WHERE id = :id');
+            $stmt->execute([':email' => $email, ':id' => $id]);
             $mensagem = 'E-mail atualizado com sucesso.';
             $tipoMensagem = 'sucesso';
         }
 
         if (isset($_POST['registrar_pedido'])) {
             $valor = str_replace(',', '.', trim($_POST['valor'] ?? ''));
-            if (!is_numeric($valor) || (float)$valor <= 0) {
-                throw new RuntimeException('Informe um valor de pedido válido.');
-            }
-
-            $stmt = $conn->prepare('INSERT INTO pedidos (valor) VALUES (?)');
-            $stmt->execute([$valor]);
+            if (!is_numeric($valor) || (float)$valor <= 0) throw new RuntimeException('Informe um valor válido.');
+            $stmt = $conn->prepare('INSERT INTO pedidos (valor) VALUES (:valor)');
+            $stmt->execute([':valor' => $valor]);
             $mensagem = 'Pedido registrado no caixa.';
             $tipoMensagem = 'sucesso';
         }
@@ -52,17 +43,11 @@ try {
     $resumo = $conn->query("SELECT COUNT(*) AS pedidos, COALESCE(SUM(valor), 0) AS faturamento FROM pedidos WHERE DATE(criado_em) = CURDATE()")->fetch(PDO::FETCH_ASSOC);
     $equipe = $conn->query('SELECT COUNT(*) FROM users_login WHERE is_active = 1')->fetchColumn();
 } catch (RuntimeException $e) {
-    $mensagem = $e->getMessage();
-    $tipoMensagem = 'erro';
-    $usuarios = $usuarios ?? [];
-    $resumo = $resumo ?? ['pedidos' => 0, 'faturamento' => 0];
-    $equipe = $equipe ?? 0;
+    $mensagem = $e->getMessage(); $tipoMensagem = 'erro';
+    $usuarios = $usuarios ?? []; $resumo = $resumo ?? ['pedidos' => 0, 'faturamento' => 0]; $equipe = $equipe ?? 0;
 } catch (PDOException $e) {
-    $mensagem = 'Não foi possível carregar os dados do painel.';
-    $tipoMensagem = 'erro';
-    $usuarios = [];
-    $resumo = ['pedidos' => 0, 'faturamento' => 0];
-    $equipe = 0;
+    $mensagem = 'Não foi possível carregar os dados do painel.'; $tipoMensagem = 'erro';
+    $usuarios = []; $resumo = ['pedidos' => 0, 'faturamento' => 0]; $equipe = 0;
 }
 ?>
 <!DOCTYPE html>
@@ -70,8 +55,8 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel administrativo - Dogão Lanches</title>
-    <link rel="stylesheet" href="admin.css">
+    <title>Painel Administrativo - Dogão Lanches</title>
+    <link rel="stylesheet" href="../public/css/style.css">
 </head>
 <body>
     <main class="painel">
@@ -79,9 +64,14 @@ try {
             <div>
                 <p class="marca">🌭 DOGÃO LANCHES</p>
                 <h1>Painel administrativo</h1>
-                <p class="boas-vindas">Olá, <?php echo htmlspecialchars($_SESSION['usuario']); ?>. Acompanhe o movimento de hoje.</p>
+                <p class="boas-vindas">Olá, <?php echo Auth::sanitizarTexto(Auth::getNome()); ?>. Acompanhe o movimento de hoje.</p>
             </div>
-            <a class="sair" href="../telalogin/index.php">Sair</a>
+            <div class="topo-botoes">
+                <?php if (Auth::isAdmin()): ?>
+                    <a class="btn-topo destaque" href="crud.php">Cadastro Funcionários</a>
+                <?php endif; ?>
+                <a class="btn-topo" href="../logout.php">Sair</a>
+            </div>
         </header>
 
         <?php if ($mensagem): ?>
@@ -89,9 +79,9 @@ try {
         <?php endif; ?>
 
         <section class="cards" aria-label="Resumo do dia">
-            <article class="card"><span>🧾</span><div><p>Pedidos hoje</p><strong><?php echo (int)$resumo['pedidos']; ?></strong></div></article>
-            <article class="card"><span>💰</span><div><p>Dinheiro no caixa</p><strong>R$ <?php echo number_format((float)$resumo['faturamento'], 2, ',', '.'); ?></strong></div></article>
-            <article class="card"><span>👥</span><div><p>Pessoas trabalhando</p><strong><?php echo (int)$equipe; ?></strong></div></article>
+            <article class="card"><span class="icone">🧾</span><div><p>Pedidos hoje</p><strong><?php echo (int)$resumo['pedidos']; ?></strong></div></article>
+            <article class="card"><span class="icone">💰</span><div><p>Dinheiro no caixa</p><strong>R$ <?php echo number_format((float)$resumo['faturamento'], 2, ',', '.'); ?></strong></div></article>
+            <article class="card"><span class="icone">👥</span><div><p>Pessoas trabalhando</p><strong><?php echo (int)$equipe; ?></strong></div></article>
         </section>
 
         <section class="grade">
@@ -103,7 +93,7 @@ try {
                             <div class="avatar"><?php echo strtoupper(htmlspecialchars(mb_substr($usuario['username'], 0, 1))); ?></div>
                             <div class="nome"><strong><?php echo htmlspecialchars($usuario['username']); ?></strong><small><?php echo $usuario['is_active'] ? 'Ativo' : 'Inativo'; ?></small></div>
                             <input type="hidden" name="usuario_id" value="<?php echo (int)$usuario['id']; ?>">
-                            <input type="email" name="email" value="<?php echo htmlspecialchars($usuario['email']); ?>" aria-label="E-mail de <?php echo htmlspecialchars($usuario['username']); ?>" required>
+                            <input type="email" name="email" value="<?php echo htmlspecialchars($usuario['email']); ?>" required>
                             <button type="submit" name="salvar_email">Salvar</button>
                         </form>
                     <?php endforeach; ?>

@@ -58,6 +58,11 @@ try {
                 <?php if (Auth::isAdmin() || Auth::isGerente() || Auth::isRecepcao()): ?>
                     <a class="btn-topo destaque" href="pedidos.php">Pedidos</a>
                 <?php endif; ?>
+                <?php if (Auth::isAdmin() || Auth::isGerente()): ?>
+                    <a class="btn-topo destaque" href="cozinha.php">Cozinha</a>
+                    <a class="btn-topo destaque" href="garcom.php">Garçom</a>
+                    <a class="btn-topo destaque" href="cardapio.php">Cardápio</a>
+                <?php endif; ?>
                 <a class="btn-topo" href="../logout.php">Sair</a>
             </div>
         </header>

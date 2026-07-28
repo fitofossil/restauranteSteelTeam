@@ -110,7 +110,7 @@ CREATE TABLE `users_login` (
   `username` varchar(45) NOT NULL,    -- Nome de login
   `email` varchar(100) NOT NULL,      -- Email do usuário
   `password_hash` varchar(255) NOT NULL, -- Senha criptografada (bcrypt)
-  `role` tinyint(3) UNSIGNED NOT NULL, -- Papel (1=admin, 2=gerente, 4=recepção)
+  `role` tinyint(3) UNSIGNED NOT NULL, -- Papel (1=admin, 2=gerente, 3=recepção, 4=cozinheiro, 5=garçom)
   `is_active` tinyint(1) NOT NULL DEFAULT 1,     -- Indica se a conta está ativa
   `failed_attempts` smallint(5) UNSIGNED NOT NULL DEFAULT 0, -- Tentativas de login falhas
   `locked_until` datetime DEFAULT NULL, -- Data/hora até quando a conta está bloqueada

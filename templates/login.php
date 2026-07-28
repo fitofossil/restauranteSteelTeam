@@ -7,7 +7,8 @@ require_once __DIR__ . '/../src/Auth.php';
 // Caso a pessoa já esteja logada, evita exibir o formulário novamente.
 Auth::iniciarSessao();
 if (Auth::isLoggedIn()) {
-    header('Location: ' . (Auth::isRecepcao() ? 'pedidos.php' : 'painel.php'));
+    $destino = Auth::isRecepcao() ? 'pedidos.php' : (Auth::isCozinheiro() ? 'cozinha.php' : (Auth::isGarcom() ? 'garcom.php' : 'painel.php'));
+    header('Location: ' . $destino);
     exit();
 }
 

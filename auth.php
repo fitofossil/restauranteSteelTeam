@@ -25,8 +25,10 @@ $auth = new Auth($conn);
 $resultado = $auth->login($email, $senha);
 
 if ($resultado['sucesso']) {
-    // A recepção inicia diretamente no caixa/pedidos.
-    $destino = Auth::isRecepcao() ? 'templates/pedidos.php' : 'templates/painel.php';
+    // Recepção e cozinha iniciam diretamente nas telas usadas durante o atendimento.
+    $destino = Auth::isRecepcao()
+        ? 'templates/pedidos.php'
+        : (Auth::isCozinheiro() ? 'templates/cozinha.php' : (Auth::isGarcom() ? 'templates/garcom.php' : 'templates/painel.php'));
     header('Location: ' . $destino);
     exit();
 } else {

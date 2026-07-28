@@ -7,6 +7,9 @@ Este é um painel interno para um restaurante. Nele, uma pessoa autorizada pode:
 - entrar com e-mail e senha;
 - consultar pedidos por mesa e o estado de pagamento;
 - registrar e atualizar pedidos pela recepção;
+- enviar pedidos de mesa para o caixa e a cozinha pelo garçom;
+- acompanhar a fila de preparo e finalizar pedidos pela cozinha;
+- cadastrar e manter os pratos disponíveis no cardápio;
 - visualizar e alterar os e-mails da equipe no painel;
 - administrar os funcionários, caso seja administrador.
 
@@ -19,6 +22,9 @@ templates/login.php ──(envia e-mail e senha)──> auth.php
         ↑                                        ↓
         └─────── erro de login             templates/painel.php
                                                     ├── templates/pedidos.php (acesso por perfil)
+                                                    ├── templates/cozinha.php (somente cozinheiro)
+                                                    ├── templates/garcom.php (garçom, gerente e admin)
+                                                    ├── templates/cardapio.php (gerente e admin)
                                                     ├── atualizar e-mail
                                                     ├── templates/crud.php (somente admin)
                                                     └── logout.php
@@ -32,11 +38,15 @@ Para acessar diretamente, use `templates/login.php`. O arquivo `public/index.php
 | --- | --- | --- |
 | `config/conexao.php` | Define a URL base do projeto e cria a conexão PDO com o MySQL. A variável `$conn` é usada nas consultas ao banco. | Sim |
 | `src/Auth.php` | Centraliza sessão, login, logout, validação de e-mail, controle de acesso e hash de senha. | Sim |
-| `auth.php` | Recebe o formulário de login, chama `Auth::login()` e envia a recepção diretamente para pedidos; os demais perfis seguem para o painel. | Sim |
+| `auth.php` | Recebe o formulário de login, chama `Auth::login()` e envia recepção, cozinha e garçom diretamente para suas respectivas telas; os demais perfis seguem para o painel. | Sim |
 | `logout.php` | Chama o logout: limpa os dados da sessão, remove o cookie e redireciona ao login. | Sim |
 | `templates/login.php` | Exibe o formulário de acesso. Com sessão válida, envia a recepção aos pedidos e os demais perfis ao painel. | Sim |
 | `templates/painel.php` | Tela principal. Exige login, mostra a equipe e permite alterar e-mails. Para pedidos, direciona os perfis permitidos à tela própria. | Sim |
-| `templates/pedidos.php` | Tela de pedidos: administrador e recepção cadastram, editam e excluem; gerente consulta. | Sim |
+| `templates/pedidos.php` | Tela de pedidos: administrador, gerente e recepção cadastram, editam e excluem. | Sim |
+| `templates/cozinha.php` | Tela exclusiva do cozinheiro, com a fila diária de preparo e a opção de marcar cada pedido como pronto. | Sim |
+| `templates/garcom.php` | Tela para registrar mesa e valor, enviando o pedido ao caixa e à cozinha. Garçom, gerente e administrador podem acessá-la. | Sim |
+| `templates/cardapio.php` | Cadastro e manutenção dos pratos disponíveis. Gerente e administrador podem acessá-la. | Sim |
+| `src/Cardapio.php` | Cria a estrutura de pratos e dos itens vinculados a cada pedido. | Sim |
 | `src/Pedidos.php` | Cria/atualiza a estrutura da tabela `pedidos` e define os status de pagamento aceitos. | Sim |
 | `templates/crud.php` | Área exclusiva de administradores para criar, buscar, editar, ativar/desativar e excluir funcionários. | Sim |
 | `public/index.php` | Atalho de entrada que redireciona para o login. | Sim |
@@ -69,11 +79,11 @@ O ID da sessão é renovado após o login para reduzir o risco de fixação de s
 | --- | --- | --- |
 | `1` | Administrador | Painel e cadastro completo de funcionários |
 | `2` | Gerente | Painel e consulta de pedidos |
-| `4` | Recepção | Entra diretamente em pedidos; consulta, cadastra e edita pedidos |
+| `3` | Recepção | Entra diretamente em pedidos; consulta, cadastra e edita pedidos |
+| `4` | Cozinheiro | Entra diretamente na cozinha e atualiza o status de preparo dos pedidos do dia |
+| `5` | Garçom | Entra diretamente na tela de pedidos e envia pedidos para o caixa e a cozinha |
 
-`Auth::requireLogin()` bloqueia quem não está logado. `Auth::requireAdmin()` usa essa verificação e também bloqueia quem não tem `role = 1`. A tela de pedidos é restrita a administrador, gerente e recepção. Administrador e recepção podem alterar pedidos; gerente apenas consulta.
-
-O perfil antigo `3` (Funcionário) foi removido. Se houver contas antigas com esse valor, um administrador deve editar cada uma e escolher Gerente ou Recepção antes que a pessoa consiga entrar novamente.
+`Auth::requireLogin()` bloqueia quem não está logado. `Auth::requireAdmin()` usa essa verificação e também bloqueia quem não tem `role = 1`. A tela de pedidos é restrita a administrador, gerente e recepção, e os três perfis podem alterar pedidos. A tela de cozinha pode ser usada por cozinheiro, gerente e administrador. A tela do garçom pode ser usada por garçom, gerente e administrador. O cardápio pode ser mantido por gerente e administrador.
 
 ## Funcionalidades por tela
 
@@ -93,7 +103,7 @@ No painel, a ação `POST` disponível é salvar e-mail (`usuario_id`, `email`),
 
 ### Pedidos — `templates/pedidos.php`
 
-A tela separada controla os pedidos por mesa e mostra os totais acumulados de hoje, separados em pago e a receber. Administrador e recepção podem registrar, editar e excluir pedidos; gerente vê a lista em modo leitura.
+A tela separada controla os pedidos por mesa e mostra os totais acumulados de hoje, separados em pago e a receber. Administrador, gerente e recepção podem registrar, editar e excluir pedidos.
 
 | Campo | Finalidade |
 | --- | --- |
@@ -104,6 +114,18 @@ A tela separada controla os pedidos por mesa e mostra os totais acumulados de ho
 Administrador e gerente veem a opção **Zerar o dia**. Ela exclui todos os pedidos registrados na data atual, pagos e pendentes, apenas depois de validar a senha da conta que está logada.
 
 O número mostrado na lista de pedidos é uma sequência visual diária: começa em `#1` a cada data e, depois de zerar o dia, o próximo pedido volta a aparecer como `#1`. O ID interno do banco permanece único para evitar conflitos entre dias diferentes.
+
+### Cozinha — `templates/cozinha.php`
+
+O cozinheiro vê apenas os pedidos criados no dia atual, em ordem de preparo: os que estão em preparo aparecem antes dos prontos. Cada item mostra número do pedido, mesa, horário de recebimento e estado de pagamento. O botão **Marcar como pronto** atualiza `pedidos.status_preparo`; se necessário, **Voltar ao preparo** desfaz a marcação.
+
+### Garçom — `templates/garcom.php`
+
+O garçom registra o número da mesa e as quantidades dos pratos disponíveis. O total é calculado a partir dos preços cadastrados. Ao enviar, o pedido é salvo como pagamento pendente e preparo aguardando, aparecendo imediatamente no caixa e na fila da cozinha com os itens que devem ser preparados.
+
+### Cardápio — `templates/cardapio.php`
+
+Gerente e administrador podem cadastrar pratos com nome, descrição e preço, além de editar ou marcar um prato como indisponível. Itens indisponíveis permanecem no histórico de pedidos, mas não podem ser selecionados pelo garçom.
 
 ### Cadastro de funcionários — `templates/crud.php`
 
@@ -126,7 +148,9 @@ Quando o administrador muda o próprio nome ou perfil, os valores equivalentes d
 | Tabela | Quem usa | Finalidade |
 | --- | --- | --- |
 | `users_login` | `Auth.php`, `painel.php`, `crud.php` | Contas, senhas com hash, perfis e status de acesso. |
-| `pedidos` | `pedidos.php`, `Pedidos.php` | Mesa, valor, status de pagamento e data de criação. É criada/atualizada automaticamente ao abrir a tela de pedidos. |
+| `pedidos` | `pedidos.php`, `cozinha.php`, `garcom.php`, `Pedidos.php` | Mesa, valor total, status de pagamento, status de preparo e data de criação. É criada/atualizada automaticamente ao abrir essas telas. |
+| `cardapio_produtos` | `cardapio.php`, `garcom.php`, `Cardapio.php` | Pratos, descrições, preços e disponibilidade. |
+| `pedido_itens` | `garcom.php`, `cozinha.php`, `pedidos.php`, `Cardapio.php` | Itens, quantidades e preço de cada prato no momento do pedido. |
 
 ### Tabelas previstas em `mesa.sql`, mas ainda sem uso no PHP
 

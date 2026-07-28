@@ -25,7 +25,7 @@ try {
             if ($username === '' || mb_strlen($username) > 45) throw new RuntimeException('Informe um nome válido (máx. 45 caracteres).');
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('Informe um e-mail válido.');
             if (strlen($senha) < 6) throw new RuntimeException('A senha deve ter no mínimo 6 caracteres.');
-            if (!$role || !in_array($role, [1, 2, 3], true)) throw new RuntimeException('Selecione um perfil válido.');
+            if (!$role || !in_array($role, [1, 2, 3, 4, 5], true)) throw new RuntimeException('Selecione um perfil válido.');
 
             // Impede duas contas usando o mesmo e-mail de login.
             $check = $conn->prepare('SELECT id FROM users_login WHERE email = ? LIMIT 1');
@@ -50,7 +50,7 @@ try {
             if (!$id) throw new RuntimeException('Funcionário inválido.');
             if ($username === '' || mb_strlen($username) > 45) throw new RuntimeException('Informe um nome válido (máx. 45 caracteres).');
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('Informe um e-mail válido.');
-            if (!$role || !in_array($role, [1, 2, 3], true)) throw new RuntimeException('Selecione um perfil válido.');
+            if (!$role || !in_array($role, [1, 2, 3, 4, 5], true)) throw new RuntimeException('Selecione um perfil válido.');
 
             $check = $conn->prepare('SELECT id FROM users_login WHERE email = ? AND id != ? LIMIT 1');
             $check->execute([$email, $id]);
@@ -125,7 +125,7 @@ try {
 }
 
 // Mapa usado tanto para exibição quanto para as opções do formulário.
-$roles = [1 => 'Administrador', 2 => 'Gerente', 3 => 'Recepção'];
+$roles = [1 => 'Administrador', 2 => 'Gerente', 3 => 'Recepção', 4 => 'Cozinheiro', 5 => 'Garçom'];
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">

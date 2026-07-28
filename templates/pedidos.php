@@ -4,6 +4,7 @@
 // =============================================================
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Pedidos.php';
+require_once __DIR__ . '/../src/Cardapio.php';
 require_once __DIR__ . '/../config/conexao.php';
 
 Auth::iniciarSessao();
@@ -14,12 +15,13 @@ Auth::requirePedidosView();
 $mensagem = '';
 $tipoMensagem = '';
 $pedidoEditando = null;
-$podeEditar = Auth::isRecepcao() || Auth::isAdmin();
+$podeEditar = Auth::isRecepcao() || Auth::isAdmin() || Auth::isGerente();
 $podeZerarDia = Auth::isAdmin() || Auth::isGerente();
 
 try {
     // Mantém o banco compatível antes de listar ou gravar pedidos.
     Pedidos::garantirTabela($conn);
+    Cardapio::garantirTabelas($conn);
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['zerar_dia'])) {
@@ -106,7 +108,11 @@ try {
     }
 
     // Busca em ordem cronológica para montar uma numeração visual que reinicia a cada dia.
-    $pedidosOrdenados = $conn->query('SELECT id, mesa_numero, valor, status_pagamento, criado_em FROM pedidos ORDER BY criado_em ASC, id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $pedidosOrdenados = $conn->query("SELECT p.id, p.mesa_numero, p.valor, p.status_pagamento, p.criado_em,
+                                             GROUP_CONCAT(CONCAT(pi.quantidade, 'x ', pi.produto_nome) ORDER BY pi.id SEPARATOR ' • ') AS itens
+                                      FROM pedidos p LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id
+                                      GROUP BY p.id, p.mesa_numero, p.valor, p.status_pagamento, p.criado_em
+                                      ORDER BY p.criado_em ASC, p.id ASC")->fetchAll(PDO::FETCH_ASSOC);
     $sequenciaPorDia = [];
     foreach ($pedidosOrdenados as &$pedido) {
         $dataPedido = date('Y-m-d', strtotime($pedido['criado_em']));
@@ -178,13 +184,14 @@ try {
                     <div class="tabela-wrap">
                         <table class="tabela">
                             <thead>
-                                <tr><th>Pedido</th><th>Mesa</th><th>Valor</th><th>Pagamento</th><th>Registrado em</th><?php if ($podeEditar): ?><th>Ações</th><?php endif; ?></tr>
+                                <tr><th>Pedido</th><th>Mesa</th><th>Itens</th><th>Valor</th><th>Pagamento</th><th>Registrado em</th><?php if ($podeEditar): ?><th>Ações</th><?php endif; ?></tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($pedidos as $pedido): ?>
                                     <tr>
                                         <td>#<?php echo (int) $pedido['numero_do_dia']; ?></td>
                                         <td>Mesa <?php echo (int) $pedido['mesa_numero']; ?></td>
+                                        <td><?php echo htmlspecialchars($pedido['itens'] ?: 'Pedido sem itens'); ?></td>
                                         <td>R$ <?php echo number_format((float) $pedido['valor'], 2, ',', '.'); ?></td>
                                         <td><span class="badge pagamento-<?php echo htmlspecialchars($pedido['status_pagamento']); ?>"><?php echo $pedido['status_pagamento'] === Pedidos::PAGO ? 'Pago' : 'Ainda não pago'; ?></span></td>
                                         <td><?php echo htmlspecialchars(date('d/m/Y H:i', strtotime($pedido['criado_em']))); ?></td>
@@ -205,7 +212,7 @@ try {
                 <?php endif; ?>
             </article>
 
-            <!-- Formulários são renderizados apenas para recepção e administrador. -->
+            <!-- Formulários são renderizados apenas para os perfis que podem editar pedidos. -->
             <?php if ($podeEditar): ?>
                 <aside class="bloco formularios">
                     <div class="formulario-card">

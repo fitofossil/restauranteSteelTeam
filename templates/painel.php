@@ -54,6 +54,7 @@ try {
             <div class="topo-botoes">
                 <?php if (Auth::isAdmin()): ?>
                     <a class="btn-topo destaque" href="crud.php">Cadastro Funcionários</a>
+                    <a class="btn-topo destaque" href="logs.php">Logs</a>
                 <?php endif; ?>
                 <?php if (Auth::isAdmin() || Auth::isGerente() || Auth::isRecepcao()): ?>
                     <a class="btn-topo destaque" href="pedidos.php">Pedidos</a>

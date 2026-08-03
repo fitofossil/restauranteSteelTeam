@@ -151,6 +151,8 @@ h2 { font-size: 1.55rem; margin: 6px 0; }
     border-bottom: 1px solid #e8dbc5; padding-bottom: 20px; margin-bottom: 20px;
 }
 .titulo-bloco > span { color: #806a57; font-size: .85rem; }
+.titulo-acoes { display: flex; align-items: center; gap: 12px; }
+.titulo-acoes form { margin: 0; }
 
 /* =============================================================
    LISTA DE USUÁRIOS (painel)
@@ -254,6 +256,9 @@ h2 { font-size: 1.55rem; margin: 6px 0; }
 .badge.pagamento-pendente { background: #f5e3bd; color: #7a5a1e; }
 .badge.preparo-aguardando { background: #fff0c9; color: #7a4c00; }
 .badge.preparo-pronto { background: #d9f0dc; color: #195c2a; }
+.badge.log-insert { background: #d9f0dc; color: #195c2a; }
+.badge.log-update { background: #dbeafe; color: #1d4ed8; }
+.badge.log-delete { background: #f9d9d5; color: #8b2218; }
 
 /* =============================================================
    STATUS (Ativar / Desativar)

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Pedidos.php';
 require_once __DIR__ . '/../src/Cardapio.php';
+require_once __DIR__ . '/../src/Log.php';
 require_once __DIR__ . '/../config/conexao.php';
 
 Auth::iniciarSessao();
@@ -12,6 +13,7 @@ $tipoMensagem = '';
 try {
     Pedidos::garantirTabela($conn);
     Cardapio::garantirTabelas($conn);
+    Log::garantirTabela($conn);
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['adicionar_pedido'])) {
         $mesa = filter_input(INPUT_POST, 'mesa_numero', FILTER_VALIDATE_INT);
@@ -28,7 +30,7 @@ try {
         if (!$quantidades) throw new RuntimeException('Informe a quantidade de pelo menos um prato.');
 
         $marcadores = implode(',', array_fill(0, count($quantidades), '?'));
-        $stmt = $conn->prepare("SELECT id, nome, preco FROM cardapio_produtos WHERE ativo = 1 AND id IN ($marcadores)");
+        $stmt = $conn->prepare("SELECT id, nome, preco FROM produtos WHERE ativo = 1 AND id IN ($marcadores)");
         $stmt->execute(array_keys($quantidades));
         $produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (count($produtos) !== count($quantidades)) throw new RuntimeException('Um dos pratos selecionados não está mais disponível.');
@@ -45,12 +47,13 @@ try {
             $itemStmt->execute([$pedidoId, $produto['id'], $produto['nome'], $quantidades[(int) $produto['id']], $produto['preco']]);
         }
         $conn->commit();
+        Log::registrar($conn, 'insert', 'pedidos', $pedidoId, "Pedido #$pedidoId enviado pelo garçom — Mesa $mesa, R$ " . number_format($total, 2, ',', '.'));
         $mensagem = 'Pedido enviado para o caixa e para a cozinha.';
         $tipoMensagem = 'sucesso';
         $_POST = [];
     }
 
-    $produtosCardapio = $conn->query('SELECT id, nome, descricao, preco FROM cardapio_produtos WHERE ativo = 1 ORDER BY nome')->fetchAll(PDO::FETCH_ASSOC);
+    $produtosCardapio = $conn->query('SELECT id, nome, descricao, preco FROM produtos WHERE ativo = 1 ORDER BY nome')->fetchAll(PDO::FETCH_ASSOC);
     $pedidos = $conn->query("SELECT p.id, p.mesa_numero, p.valor, p.status_pagamento, p.status_preparo, p.criado_em,
                                     GROUP_CONCAT(CONCAT(pi.quantidade, 'x ', pi.produto_nome) ORDER BY pi.id SEPARATOR ' • ') AS itens
                              FROM pedidos p LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id

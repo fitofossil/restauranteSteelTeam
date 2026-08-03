@@ -3,6 +3,7 @@
 // CADASTRO DE FUNCIONÁRIOS — CRUD
 // =============================================================
 require_once __DIR__ . '/../src/Auth.php';
+require_once __DIR__ . '/../src/Log.php';
 require_once __DIR__ . '/../config/conexao.php';
 // Esta página inteira é exclusiva de administradores.
 Auth::requireAdmin();
@@ -13,6 +14,8 @@ $tipoMensagem = '';
 $funcionarioEditando = null;
 
 try {
+    Log::garantirTabela($conn);
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // ADICIONAR FUNCIONÁRIO
@@ -35,6 +38,7 @@ try {
             $hash = password_hash($senha, PASSWORD_DEFAULT);
             $stmt = $conn->prepare('INSERT INTO users_login (username, email, password_hash, role, is_active) VALUES (?, ?, ?, ?, 1)');
             $stmt->execute([$username, $email, $hash, $role]);
+            Log::registrar($conn, 'insert', 'users_login', (int) $conn->lastInsertId(), "Funcionário cadastrado: $username (perfil $role).");
             $mensagem = 'Funcionário cadastrado com sucesso.';
             $tipoMensagem = 'sucesso';
         }
@@ -66,6 +70,7 @@ try {
                 $stmt = $conn->prepare('UPDATE users_login SET username = ?, email = ?, role = ?, is_active = ? WHERE id = ?');
                 $stmt->execute([$username, $email, $role, $is_active, $id]);
             }
+            Log::registrar($conn, 'update', 'users_login', $id, "Funcionário #$id atualizado: $username (perfil $role, ativo=" . ($is_active ? 'sim' : 'não') . ').');
 
             // Se o admin alterou a própria conta, mantém o nome e perfil da sessão atualizados.
             if ($id == Auth::getId()) {
@@ -84,6 +89,7 @@ try {
             if ($id == Auth::getId()) throw new RuntimeException('Você não pode excluir seu próprio usuário.');
             $stmt = $conn->prepare('DELETE FROM users_login WHERE id = ?');
             $stmt->execute([$id]);
+            Log::registrar($conn, 'delete', 'users_login', $id, "Funcionário #$id excluído.");
             $mensagem = 'Funcionário excluído com sucesso.';
             $tipoMensagem = 'sucesso';
         }
@@ -94,6 +100,7 @@ try {
             if (!$id) throw new RuntimeException('Funcionário inválido.');
             $stmt = $conn->prepare('UPDATE users_login SET is_active = NOT is_active WHERE id = ?');
             $stmt->execute([$id]);
+            Log::registrar($conn, 'update', 'users_login', $id, "Status de ativação do funcionário #$id alternado.");
             $mensagem = 'Status do funcionário alterado.';
             $tipoMensagem = 'sucesso';
         }

@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Cardapio.php';
+require_once __DIR__ . '/../src/Log.php';
 require_once __DIR__ . '/../config/conexao.php';
 
 // Controle de Acesso e Sessão
@@ -23,6 +24,7 @@ $tipos = [];
 try {
     // Garante estruturalmente que as tabelas necessárias existam no banco
     Cardapio::garantirTabelas($conn);
+    Log::garantirTabela($conn);
 
     // Busca as opções de Categorias e Tipos para popular os seletores do formulário
     $categorias = $conn->query('SELECT id, nome FROM categorias_produto ORDER BY nome ASC')->fetchAll(PDO::FETCH_ASSOC);
@@ -48,6 +50,7 @@ try {
             
             $stmt = $conn->prepare('INSERT INTO categorias_produto (nome) VALUES (?)');
             $stmt->execute([$nomeCategoria]);
+            Log::registrar($conn, 'insert', 'categorias_produto', (int) $conn->lastInsertId(), "Categoria cadastrada: $nomeCategoria.");
             
             $mensagem = 'Categoria cadastrada.';
             $tipoMensagem = 'sucesso';
@@ -62,6 +65,7 @@ try {
             
             $stmt = $conn->prepare('INSERT INTO tipos_produto (nome) VALUES (?)');
             $stmt->execute([$nomeTipo]);
+            Log::registrar($conn, 'insert', 'tipos_produto', (int) $conn->lastInsertId(), "Tipo cadastrado: $nomeTipo.");
             
             $mensagem = 'Tipo cadastrado.';
             $tipoMensagem = 'sucesso';
@@ -90,6 +94,7 @@ try {
         if (isset($_POST['adicionar_produto'])) {
             $stmt = $conn->prepare('INSERT INTO produtos (nome, tipo_id, categoria_id, descricao, preco, ativo) VALUES (?, ?, ?, ?, ?, 1)');
             $stmt->execute([$nome, $tipoId, $categoriaId, $descricao, $preco]);
+            Log::registrar($conn, 'insert', 'produtos', (int) $conn->lastInsertId(), "Prato cadastrado: $nome (R$ $preco).");
             
             $mensagem = 'Prato cadastrado no cardápio.';
             $tipoMensagem = 'sucesso';
@@ -105,6 +110,7 @@ try {
             $ativo = isset($_POST['ativo']) ? 1 : 0;
             $stmt = $conn->prepare('UPDATE produtos SET nome = ?, tipo_id = ?, categoria_id = ?, descricao = ?, preco = ?, ativo = ? WHERE id = ?');
             $stmt->execute([$nome, $tipoId, $categoriaId, $descricao, $preco, $ativo, $id]);
+            Log::registrar($conn, 'update', 'produtos', $id, "Prato #$id atualizado: $nome (R$ $preco, ativo=" . ($ativo ? 'sim' : 'não') . ').');
             
             $mensagem = 'Prato atualizado.';
             $tipoMensagem = 'sucesso';
@@ -118,6 +124,7 @@ try {
             }
             
             $conn->prepare('UPDATE produtos SET ativo = NOT ativo WHERE id = ?')->execute([$id]);
+            Log::registrar($conn, 'update', 'produtos', $id, "Disponibilidade do prato #$id alternada.");
             
             $mensagem = 'Disponibilidade do prato atualizada.';
             $tipoMensagem = 'sucesso';
@@ -132,6 +139,7 @@ try {
 
             $stmt = $conn->prepare('DELETE FROM produtos WHERE id = ?');
             $stmt->execute([$id]);
+            Log::registrar($conn, 'delete', 'produtos', $id, "Prato #$id removido do cardápio.");
 
             $mensagem = 'Prato removido do cardápio com sucesso.';
             $tipoMensagem = 'sucesso';

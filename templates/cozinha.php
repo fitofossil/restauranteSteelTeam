@@ -5,6 +5,7 @@
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Pedidos.php';
 require_once __DIR__ . '/../src/Cardapio.php';
+require_once __DIR__ . '/../src/Log.php';
 require_once __DIR__ . '/../config/conexao.php';
 
 Auth::iniciarSessao();
@@ -16,6 +17,7 @@ $tipoMensagem = '';
 try {
     Pedidos::garantirTabela($conn);
     Cardapio::garantirTabelas($conn);
+    Log::garantirTabela($conn);
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['atualizar_preparo'])) {
         $pedidoId = filter_input(INPUT_POST, 'pedido_id', FILTER_VALIDATE_INT);
@@ -31,6 +33,7 @@ try {
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Pedido não encontrado ou já não pertence ao dia de hoje.');
         }
+        Log::registrar($conn, 'update', 'pedidos', $pedidoId, "Status de preparo do pedido #$pedidoId alterado para '$statusPreparo'.");
 
         $mensagem = $statusPreparo === Pedidos::PRONTO
             ? 'Pedido marcado como pronto para entrega.'

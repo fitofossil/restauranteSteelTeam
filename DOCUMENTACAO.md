@@ -149,7 +149,7 @@ Quando o administrador muda o próprio nome ou perfil, os valores equivalentes d
 | --- | --- | --- |
 | `users_login` | `Auth.php`, `painel.php`, `crud.php` | Contas, senhas com hash, perfis e status de acesso. |
 | `pedidos` | `pedidos.php`, `cozinha.php`, `garcom.php`, `Pedidos.php` | Mesa, valor total, status de pagamento, status de preparo e data de criação. É criada/atualizada automaticamente ao abrir essas telas. |
-| `cardapio_produtos` | `cardapio.php`, `garcom.php`, `Cardapio.php` | Pratos, descrições, preços e disponibilidade. |
+| `produtos` | `cardapio.php`, `garcom.php`, `Cardapio.php` | Pratos, descrições, preços e disponibilidade. |
 | `pedido_itens` | `garcom.php`, `cozinha.php`, `pedidos.php`, `Cardapio.php` | Itens, quantidades e preço de cada prato no momento do pedido. |
 
 ### Tabelas previstas em `mesa.sql`, mas ainda sem uso no PHP

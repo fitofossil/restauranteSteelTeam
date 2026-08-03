@@ -1,12 +1,6 @@
 -- =========================================================
--- BANCO DE DADOS: restaurante
+-- BANCO DE DADOS: restaurante (Versão Corrigida e Otimizada)
 -- =========================================================
--- Simula o funcionamento de um restaurante:
--- - Cardápio (categorias, tipos e produtos)
--- - Mesas e pedidos
--- - Usuários e auditoria de login
--- =========================================================
-
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -16,10 +10,11 @@ SET time_zone = "+00:00";
 CREATE DATABASE IF NOT EXISTS `restaurante` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE `restaurante`;
 
--- Remoção das tabelas na ordem inversa das chaves estrangeiras para evitar erros
+-- Remoção das tabelas na ordem correta das chaves estrangeiras
 DROP TABLE IF EXISTS `login_audit`;
-DROP TABLE IF EXISTS `usuarios`;
-DROP TABLE IF EXISTS `comanda_pedidos`;
+DROP TABLE IF EXISTS `users_login`;
+DROP TABLE IF EXISTS `pedido_itens`;
+DROP TABLE IF EXISTS `pedidos`;
 DROP TABLE IF EXISTS `mesas`;
 DROP TABLE IF EXISTS `produtos`;
 DROP TABLE IF EXISTS `tipos_produto`;
@@ -28,119 +23,146 @@ DROP TABLE IF EXISTS `categorias_produto`;
 -- =========================================================
 -- TABELA: categorias_produto
 -- =========================================================
--- Armazena categorias específicas de produtos (ex.: Carnes, Massas, Sucos).
 CREATE TABLE `categorias_produto` (
-  `id` int(11) NOT NULL,          -- Identificador único da categoria
-  `nome` varchar(50) NOT NULL     -- Nome da categoria (ex.: "Carnes")
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nome` varchar(50) NOT NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================
 -- TABELA: tipos_produto
 -- =========================================================
--- Define tipos gerais de produtos (ex.: Menu principal, Bebidas).
 CREATE TABLE `tipos_produto` (
-  `id` int(11) NOT NULL,          -- Identificador único do tipo
-  `nome` varchar(50) NOT NULL     -- Nome do tipo (ex.: "Bebidas")
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nome` varchar(50) NOT NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================
 -- TABELA: produtos
 -- =========================================================
--- Lista os itens do cardápio, vinculando tipo e categoria.
 CREATE TABLE `produtos` (
-  `id` int(11) NOT NULL,          -- Identificador único do produto
-  `nome` varchar(100) NOT NULL,   -- Nome do produto (ex.: "Pizza Calabresa")
-  `tipo_id` int(11) NOT NULL,     -- FK para tipos_produto
-  `categoria_id` int(11) NOT NULL,-- FK para categorias_produto
-  `preco` decimal(10,2) NOT NULL  -- Preço do produto
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nome` varchar(100) NOT NULL,
+  `tipo_id` int(11) NOT NULL,
+  `categoria_id` int(11) NOT NULL,
+  `preco` decimal(10,2) NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`tipo_id`) REFERENCES `tipos_produto`(`id`),
+  FOREIGN KEY (`categoria_id`) REFERENCES `categorias_produto`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================
 -- TABELA: mesas
 -- =========================================================
--- Representa mesas físicas do restaurante, com capacidade e reservas.
-CREATE TABLE `tables` (
-  `id` smallint(5) UNSIGNED NOT NULL, -- Identificador único da mesa
-  `numero` tinyint(3) UNSIGNED NOT NULL, -- Número da mesa (ex.: 1, 2, 3)
-  `capacidade` tinyint(3) UNSIGNED NOT NULL, -- Quantidade de lugares
-  `status` tinyint(3) UNSIGNED NOT NULL,     -- Status da mesa (ex.: livre, ocupada)
-  `hora_reserva` datetime NOT NULL,          -- Data/hora da reserva
-  `reservado_por` varchar(45) NOT NULL,      -- Nome da pessoa que reservou
-  `tel_reseva` varchar(15) NOT NULL          -- Telefone de contato da reserva
+CREATE TABLE `mesas` (
+  `id` smallint(5) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `numero` tinyint(3) UNSIGNED NOT NULL,
+  `capacidade` tinyint(3) UNSIGNED NOT NULL,
+  `status` tinyint(3) UNSIGNED NOT NULL DEFAULT 0, -- 0=Livre, 1=Ocupada
+  `hora_reserva` datetime DEFAULT NULL,
+  `reservado_por` varchar(45) DEFAULT NULL,
+  `tel_reserva` varchar(15) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_mesa_numero` (`numero`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================
--- TABELA: comandapedidos
+-- TABELA: pedidos (Cabeçalho da Comanda)
 -- =========================================================
--- Registra pedidos feitos nas mesas, vinculando ao produto.
-CREATE TABLE `comandapedidos` (
-  `id` int(11) NOT NULL,              -- Identificador único do pedido
-  `mesa_id` smallint(5) UNSIGNED NOT NULL, -- FK para tables
-  `produto_id` int(11) NOT NULL,      -- FK para produtos
-  `preco` decimal(10,2) NOT NULL,     -- Preço unitário do produto
-  `quantidade` int(10) NOT NULL,      -- Quantidade pedida
-  `info` varchar(100) NOT NULL,       -- Observações adicionais (ex.: sem cebola)
-  `status_pedido` varchar(20) NOT NULL DEFAULT 'recebido', -- Status (recebido, em preparo, entregue)
-  `aberto` tinyint(1) NOT NULL DEFAULT 1, -- Indica se o pedido ainda está aberto
-  `forma_pagamento` varchar(30) DEFAULT NULL, -- Forma de pagamento (dinheiro, cartão)
-  `finalizado_em` datetime DEFAULT NULL,     -- Data/hora de finalização
-  `criado_em` datetime NOT NULL DEFAULT current_timestamp() -- Data/hora de criação
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- =========================================================
--- TABELA: pedidos
--- =========================================================
--- Controle simples usado pela tela de pedidos da recepção.
 CREATE TABLE `pedidos` (
   `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
-  `mesa_numero` smallint(5) UNSIGNED NOT NULL,
-  `valor` decimal(10,2) NOT NULL,
-  `status_pagamento` varchar(10) NOT NULL DEFAULT 'pendente', -- pendente ou pago
+  `mesa_id` smallint(5) UNSIGNED NOT NULL,
+  `status_pagamento` varchar(10) NOT NULL DEFAULT 'pendente', -- pendente, pago
+  `forma_pagamento` varchar(30) DEFAULT NULL,
   `criado_em` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
+  `finalizado_em` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`mesa_id`) REFERENCES `mesas`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================
--- TABELA: users
+-- TABELA: pedido_itens (Produtos lançados na comanda)
 -- =========================================================
--- Cadastro de usuários do sistema (login administrativo).
--- Inclui controle de tentativas de login e bloqueio.
+CREATE TABLE `pedido_itens` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `pedido_id` int(10) UNSIGNED NOT NULL,
+  `produto_id` int(11) NOT NULL,
+  `preco_historico` decimal(10,2) NOT NULL,
+  `quantidade` int(10) NOT NULL DEFAULT 1,
+  `info` varchar(100) DEFAULT NULL,
+  `status_preparo` varchar(20) NOT NULL DEFAULT 'recebido', -- recebido, em preparo, entregue
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`pedido_id`) REFERENCES `pedidos`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`produto_id`) REFERENCES `produtos`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================
+-- TABELA: users_login
+-- =========================================================
 CREATE TABLE `users_login` (
-  `id` int(10) UNSIGNED NOT NULL,     -- Identificador único do usuário
-  `username` varchar(45) NOT NULL,    -- Nome de login
-  `email` varchar(100) NOT NULL,      -- Email do usuário
-  `password_hash` varchar(255) NOT NULL, -- Senha criptografada (bcrypt)
-  `role` tinyint(3) UNSIGNED NOT NULL, -- Papel (1=admin, 2=gerente, 3=recepção, 4=cozinheiro, 5=garçom)
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,     -- Indica se a conta está ativa
-  `failed_attempts` smallint(5) UNSIGNED NOT NULL DEFAULT 0, -- Tentativas de login falhas
-  `locked_until` datetime DEFAULT NULL, -- Data/hora até quando a conta está bloqueada
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(), -- Data de criação
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() -- Última atualização
-);
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `username` varchar(45) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `role` tinyint(3) UNSIGNED NOT NULL, -- 1=admin, 2=gerente, 3=recepção
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `failed_attempts` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `locked_until` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_users_login_username` (`username`),
+  UNIQUE KEY `uq_users_login_email` (`email`),
+  CONSTRAINT `chk_users_login_role` CHECK (`role` BETWEEN 1 AND 3),
+  CONSTRAINT `chk_users_login_failed_attempts` CHECK (`failed_attempts` <= 10)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================
 -- TABELA: login_audit
 -- =========================================================
--- Registra tentativas de login (sucesso ou falha),
--- incluindo IP e motivo em caso de erro.
 CREATE TABLE `login_audit` (
-  `id` bigint(20) UNSIGNED NOT NULL,  -- Identificador único do log
-  `user_id` int(10) UNSIGNED DEFAULT NULL, -- FK para users
-  `login_at` timestamp NOT NULL DEFAULT current_timestamp(), -- Data/hora da tentativa
-  `ip_address` varchar(45) DEFAULT NULL, -- IP de origem
-  `success` tinyint(1) NOT NULL,         -- 1=sucesso, 0=falha
-  `reason` varchar(100) DEFAULT NULL     -- Motivo da falha (ex.: senha incorreta)
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) UNSIGNED DEFAULT NULL,
+  `login_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `success` tinyint(1) NOT NULL,
+  `reason` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users_login`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- POPULANDO O BANCO DE DADOS
--- Usuário administrativo inicial
--- Login: admin@restaurante.local | Senha: admin
-INSERT INTO `users_login` (
-  `id`, `username`, `email`, `password_hash`, `role`, `is_active`,
-  `failed_attempts`, `locked_until`
-) VALUES (
-  1, 'admin', 'admin@restaurante.local',
-  '$2y$10$C.p3cBfBgZ1No8unosWRvuDZ.xTeNLgoJxKZEt4fLljGBaXdSNzUy',
-  1, 1, 0, NULL
-);
+-- =========================================================
+-- CARGA DE DADOS INICIAIS (INSERTS)
+-- =========================================================
+
+-- 1. Tipos de Produto
+INSERT INTO `tipos_produto` (`nome`) VALUES 
+('Entradas e Petiscos'),
+('Pratos Principais'),
+('Sobremesas'),
+('Bebidas'),
+('Menu Infantil');
+
+-- 2. Categorias de Produto
+INSERT INTO `categorias_produto` (`nome`) VALUES 
+('Carnes e Grelhados'),
+('Aves'),
+('Peixes e Frutos do Mar'),
+('Massas e Risotos'),
+('Saladas e Saudáveis'),
+('Pizzas e Hambúrgueres'),
+('Doces e Tortas'),
+('Sorvetes'),
+('Sucos Naturais e Refrigerantes'),
+('Cervejas e Chopes'),
+('Vinhos e Espumantes'),
+('Drinks e Coquetéis'),
+('Cafés e Digestivos');
+
+-- 3. Usuário Administrador Padrão
+INSERT INTO `users_login` (`username`, `email`, `password_hash`, `role`) 
+VALUES ('admin', 'admin@restaurante.local', '$2y$10$C.p3cBfBgZ1No8unosWRvuDZ.xTeNLgoJxKZEt4fLljGBaXdSNzUy', 1);
+
+COMMIT;

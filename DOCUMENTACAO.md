@@ -143,6 +143,10 @@ Quando o administrador muda o próprio nome ou perfil, os valores equivalentes d
 
 ## Banco de dados
 
+A imagem abaixo mostra o diagrama entidade-relacionamento (DER) do banco, evidenciando como as principais entidades do sistema se conectam:
+
+![DER do banco de dados do restaurante](img/saida_page-0001.jpg)
+
 ### Tabelas usadas hoje pelo PHP
 
 | Tabela | Quem usa | Finalidade |
@@ -168,21 +172,9 @@ Essas tabelas fazem parte do modelo do restaurante, mas a interface atual ainda 
 ### Instalação do banco
 
 1. Crie o banco `restaurante` no MySQL.
-2. Importe `mesa.sql`.
-3. Aplique a migração abaixo, pois o arquivo SQL cria as tabelas sem as chaves primárias e `AUTO_INCREMENT` necessários para os cadastros atuais:
+2. Importe `restaurante.sql`.
 
-```sql
-ALTER TABLE `categorias_produto` ADD PRIMARY KEY (`id`);
-ALTER TABLE `categorias_produto` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-ALTER TABLE `tipos_produto` ADD PRIMARY KEY (`id`);
-ALTER TABLE `tipos_produto` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-ALTER TABLE `produtos` ADD PRIMARY KEY (`id`);
-ALTER TABLE `produtos` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-ALTER TABLE `users_login` ADD PRIMARY KEY (`id`);
-ALTER TABLE `users_login` MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
-```
-
-O usuário inicial definido no SQL é `admin@restaurante.local`. A senha descrita no arquivo é `admin`.
+O usuário inicial definido no SQL é `administrador@email.com`. A senha descrita no arquivo é `administrador`.
 
 ## Proteções já presentes
 

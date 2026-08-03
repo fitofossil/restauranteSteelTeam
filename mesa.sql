@@ -105,7 +105,7 @@ CREATE TABLE `users_login` (
   `username` varchar(45) NOT NULL,
   `email` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
-  `role` tinyint(3) UNSIGNED NOT NULL, -- 1=admin, 2=gerente, 3=recepção
+  `role` tinyint(3) UNSIGNED NOT NULL, -- 1=admin, 2=gerente, 3=recepção, 4=cozinheiro, 5=garçom
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `failed_attempts` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
   `locked_until` datetime DEFAULT NULL,
@@ -114,7 +114,7 @@ CREATE TABLE `users_login` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_users_login_username` (`username`),
   UNIQUE KEY `uq_users_login_email` (`email`),
-  CONSTRAINT `chk_users_login_role` CHECK (`role` BETWEEN 1 AND 3),
+  CONSTRAINT `chk_users_login_role` CHECK (`role` BETWEEN 1 AND 5),
   CONSTRAINT `chk_users_login_failed_attempts` CHECK (`failed_attempts` <= 10)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

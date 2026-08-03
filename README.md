@@ -5,7 +5,7 @@ Projeto de WebDev do curso de BackEnd do SENAI-RS: um painel interno do **Dogão
 ## Início rápido
 
 1. Inicie Apache e MySQL no XAMPP.
-2. Crie o banco `restaurante` e importe [mesa.sql](mesa.sql).
+2. Crie o banco `restaurante` e importe [restaurante.sql](restaurante.sql).
 3. Aplique a migração indicada na [documentação completa](DOCUMENTACAO.md#instalação-do-banco).
 4. Acesse `http://localhost/restauranteSteelTeam/templates/login.php`.
 

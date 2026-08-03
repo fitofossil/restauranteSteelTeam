@@ -64,6 +64,10 @@ class Auth
             return ['sucesso' => false, 'mensagem' => 'Conta desativada. Contacte o administrador.'];
         }
 
+        if (!$this->validarRole($user['role'])) {
+            return ['sucesso' => false, 'mensagem' => 'Este perfil não é mais utilizado. Contacte o administrador.'];
+        }
+
         if (!password_verify($senha, $user['password_hash'])) {
             return ['sucesso' => false, 'mensagem' => 'E-mail ou senha incorretos.'];
         }
@@ -115,10 +119,108 @@ class Auth
         return isset($_SESSION['usuario_role']) && (int) $_SESSION['usuario_role'] === 1;
     }
 
+    public static function isGerente(): bool
+    {
+        return isset($_SESSION['usuario_role']) && (int) $_SESSION['usuario_role'] === 2;
+    }
+
+    public static function isRecepcao(): bool
+    {
+        return isset($_SESSION['usuario_role']) && (int) $_SESSION['usuario_role'] === 3;
+    }
+
+    public static function isCozinheiro(): bool
+    {
+        return isset($_SESSION['usuario_role']) && (int) $_SESSION['usuario_role'] === 4;
+    }
+
+    public static function isGarcom(): bool
+    {
+        return isset($_SESSION['usuario_role']) && (int) $_SESSION['usuario_role'] === 5;
+    }
+
     public static function requireAdmin(): void
     {
         self::requireLogin();
         if (!self::isAdmin()) {
+            header('Location: ' . BASE_URL . '/templates/painel.php');
+            exit();
+        }
+    }
+
+    // Recepção, cozinha e garçom trabalham diretamente em suas telas, não no painel.
+    public static function requirePainel(): void
+    {
+        self::requireLogin();
+        if (self::isRecepcao()) {
+            header('Location: ' . BASE_URL . '/templates/pedidos.php');
+            exit();
+        }
+        if (self::isCozinheiro()) {
+            header('Location: ' . BASE_URL . '/templates/cozinha.php');
+            exit();
+        }
+        if (self::isGarcom()) {
+            header('Location: ' . BASE_URL . '/templates/garcom.php');
+            exit();
+        }
+    }
+
+    // Administrador, gerente e recepção podem consultar os pedidos.
+    public static function requirePedidosView(): void
+    {
+        self::requireLogin();
+        if (!self::isAdmin() && !self::isGerente() && !self::isRecepcao()) {
+            header('Location: ' . BASE_URL . '/templates/painel.php');
+            exit();
+        }
+    }
+
+    // Administrador, gerente e recepção podem criar ou alterar pedidos.
+    public static function requireEditarPedidos(): void
+    {
+        self::requireLogin();
+        if (!self::isRecepcao() && !self::isAdmin() && !self::isGerente()) {
+            header('Location: ' . BASE_URL . '/templates/pedidos.php');
+            exit();
+        }
+    }
+
+    // Administrador e gerente podem encerrar/zerar o caixa do dia.
+    public static function requireZerarCaixa(): void
+    {
+        self::requireLogin();
+        if (!self::isAdmin() && !self::isGerente()) {
+            header('Location: ' . BASE_URL . '/templates/pedidos.php');
+            exit();
+        }
+    }
+
+    // Cozinha, gerente e administrador podem acompanhar e atualizar o preparo.
+    public static function requireCozinha(): void
+    {
+        self::requireLogin();
+        if (!self::isCozinheiro() && !self::isGerente() && !self::isAdmin()) {
+            header('Location: ' . BASE_URL . '/templates/painel.php');
+            exit();
+        }
+    }
+
+    // Garçom, gerente e administrador podem registrar pedidos para caixa e cozinha.
+    public static function requireGarcom(): void
+    {
+        self::requireLogin();
+        if (!self::isGarcom() && !self::isGerente() && !self::isAdmin()) {
+            header('Location: ' . BASE_URL . '/templates/painel.php');
+            exit();
+        }
+    }
+
+    // Administrador e gerente podem cadastrar e manter os pratos do cardápio.
+    public static function requireGerenciarCardapio(): void
+    {
+        self::requireLogin();
+        if (!self::isAdmin() && !self::isGerente()) {
             header('Location: ' . BASE_URL . '/templates/painel.php');
             exit();
         }
@@ -155,7 +257,7 @@ class Auth
 
     public function validarRole($role): bool
     {
-        return in_array((int) $role, [1, 2, 3], true);
+        return in_array((int) $role, [1, 2, 3, 4, 5], true);
     }
 
     public static function hashSenha(string $senha): string

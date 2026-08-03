@@ -1,0 +1,7 @@
+{
+  "php.validate.executablePath": "/opt/lampp/bin/php",
+  "php.debug.executablePath": "/opt/lampp/bin/php",
+  "php.executables": [
+    "/opt/lampp/bin/php"
+  ]
+}

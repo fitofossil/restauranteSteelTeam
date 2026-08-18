@@ -1,5 +1,7 @@
 # Documentação do sistema — Dogão Lanches
 
+> **Nota desta revisão:** este documento foi revisado a partir do `restaurante.sql` real em uso. Principais correções: o modelo de pedidos já está unificado (`pedidos` + `pedido_itens`, não existe mais `comandapedidos`); a mesa é selecionada a partir do cadastro em `mesas`, não digitada livremente; e a estrutura de bloqueio de conta por tentativas falhas já existe no banco. Detalhes de cada ponto estão marcados abaixo como **⚠ Confirmar**.
+
 ## O que este projeto faz
 
 Este é um painel interno para um restaurante. Nele, uma pessoa autorizada pode:
@@ -44,14 +46,14 @@ Para acessar diretamente, use `templates/login.php`. O arquivo `public/index.php
 | `templates/painel.php` | Tela principal. Exige login, mostra a equipe e permite alterar e-mails. Para pedidos, direciona os perfis permitidos à tela própria. | Sim |
 | `templates/pedidos.php` | Tela de pedidos: administrador, gerente e recepção cadastram, editam e excluem. | Sim |
 | `templates/cozinha.php` | Tela exclusiva do cozinheiro, com a fila diária de preparo e a opção de marcar cada pedido como pronto. | Sim |
-| `templates/garcom.php` | Tela para registrar mesa e valor, enviando o pedido ao caixa e à cozinha. Garçom, gerente e administrador podem acessá-la. | Sim |
+| `templates/garcom.php` | Tela para registrar mesa e itens, enviando o pedido ao caixa e à cozinha. Garçom, gerente e administrador podem acessá-la. | Sim |
 | `templates/cardapio.php` | Cadastro e manutenção dos pratos disponíveis. Gerente e administrador podem acessá-la. | Sim |
 | `src/Cardapio.php` | Cria a estrutura de pratos e dos itens vinculados a cada pedido. | Sim |
 | `src/Pedidos.php` | Cria/atualiza a estrutura da tabela `pedidos` e define os status de pagamento aceitos. | Sim |
 | `templates/crud.php` | Área exclusiva de administradores para criar, buscar, editar, ativar/desativar e excluir funcionários. | Sim |
 | `public/index.php` | Atalho de entrada que redireciona para o login. | Sim |
 | `public/css/style.css` | Estilos da tela de login, painel e cadastro de funcionários, incluindo adaptação para celular. | Sim |
-| `mesa.sql` | Estrutura inicial e usuário administrador do banco de dados. | Sim, na instalação |
+| `restaurante.sql` | Estrutura inicial e usuários de exemplo do banco de dados. | Sim, na instalação |
 | `.htaccess` | Bloqueia acesso web direto às pastas `config/` e `src/` e envia alguns cabeçalhos de segurança. | Sim, se o Apache permitir `.htaccess` |
 | `templates/index.php` | Redireciona links antigos para `painel.php`. | Sim, como compatibilidade |
 | `templates/admin.css` | Folha de estilo antiga, atualmente não carregada. | Não |
@@ -66,8 +68,8 @@ Depois de um login válido, `src/Auth.php` guarda estes dados em `$_SESSION`:
 
 | Chave | Conteúdo |
 | --- | --- |
-| `usuario_id` | ID do usuário no banco |
-| `usuario` | Nome exibido no sistema |
+| `usuario_id` | ID do usuário no banco (`users_login.id`) |
+| `usuario` | Nome exibido no sistema (`users_login.username`) |
 | `usuario_email` | E-mail do usuário |
 | `usuario_role` | Perfil de acesso |
 
@@ -91,6 +93,8 @@ O ID da sessão é renovado após o login para reduzir o risco de fixação de s
 
 O formulário envia `email` e `senha` por `POST` para `auth.php`. A senha enviada nunca é comparada diretamente com o banco: `Auth::login()` usa `password_verify()` contra `users_login.password_hash`.
 
+**⚠ Confirmar:** o schema reserva `users_login.failed_attempts` e `users_login.locked_until` para bloqueio de conta após tentativas malsucedidas. Vale confirmar se `Auth::login()` já incrementa/verifica esses campos ou se essa lógica ainda precisa ser implementada.
+
 ### Painel — `templates/painel.php`
 
 Ao abrir, o painel:
@@ -107,13 +111,14 @@ A tela separada controla os pedidos por mesa e mostra os totais acumulados de ho
 
 | Campo | Finalidade |
 | --- | --- |
-| Mesa | Número da mesa, entre 1 e 999. |
-| Valor | Valor total do pedido. |
+| Mesa | Selecionada a partir das mesas cadastradas em `mesas` (hoje 12 mesas, numeradas de 1 a 12, com capacidades entre 2 e 8 lugares) — não é mais um número livre digitado. |
 | Status de pagamento | `Ainda não pago` ou `Pago`. |
+
+**⚠ Confirmar:** `pedidos` não tem coluna de valor total. O total precisa vir da soma de `pedido_itens.quantidade × pedido_itens.preco_unitario`, ou a tela de recepção ainda depende de um campo "Valor" que não existe mais na tabela atual. Vale checar como `pedidos.php` calcula/grava esse valor hoje.
 
 Administrador e gerente veem a opção **Zerar o dia**. Ela exclui todos os pedidos registrados na data atual, pagos e pendentes, apenas depois de validar a senha da conta que está logada.
 
-O número mostrado na lista de pedidos é uma sequência visual diária: começa em `#1` a cada data e, depois de zerar o dia, o próximo pedido volta a aparecer como `#1`. O ID interno do banco permanece único para evitar conflitos entre dias diferentes.
+O número mostrado na lista de pedidos é uma sequência visual diária: começa em `#1` a cada data e, depois de zerar o dia, o próximo pedido volta a aparecer como `#1`. O ID interno do banco (`pedidos.id`) permanece único para evitar conflitos entre dias diferentes.
 
 ### Cozinha — `templates/cozinha.php`
 
@@ -121,11 +126,11 @@ O cozinheiro vê apenas os pedidos criados no dia atual, em ordem de preparo: os
 
 ### Garçom — `templates/garcom.php`
 
-O garçom registra o número da mesa e as quantidades dos pratos disponíveis. O total é calculado a partir dos preços cadastrados. Ao enviar, o pedido é salvo como pagamento pendente e preparo aguardando, aparecendo imediatamente no caixa e na fila da cozinha com os itens que devem ser preparados.
+O garçom seleciona a mesa (a partir de `mesas`) e as quantidades dos pratos disponíveis em `produtos`. O total é calculado a partir dos preços cadastrados, e cada item vira uma linha em `pedido_itens` com o preço congelado no momento da venda. Ao enviar, o pedido é salvo como pagamento pendente e preparo aguardando, aparecendo imediatamente no caixa e na fila da cozinha com os itens que devem ser preparados.
 
 ### Cardápio — `templates/cardapio.php`
 
-Gerente e administrador podem cadastrar pratos com nome, descrição e preço, além de editar ou marcar um prato como indisponível. Itens indisponíveis permanecem no histórico de pedidos, mas não podem ser selecionados pelo garçom.
+Gerente e administrador podem cadastrar pratos com nome, descrição, preço, tipo (`tipos_produto`) e categoria (`categorias_produto`), além de editar ou marcar um prato como indisponível (`produtos.ativo`). Itens indisponíveis permanecem no histórico de pedidos, mas não podem ser selecionados pelo garçom.
 
 ### Cadastro de funcionários — `templates/crud.php`
 
@@ -133,7 +138,7 @@ Somente administradores entram nesta página. Ela trabalha exclusivamente com `u
 
 | Ação | O que acontece |
 | --- | --- |
-| Cadastrar | Valida nome, e-mail, senha e perfil; verifica e-mail repetido; salva a senha com hash. |
+| Cadastrar | Valida nome, e-mail, senha e perfil; verifica e-mail e nome de usuário repetidos; salva a senha com hash. |
 | Buscar | Filtra por nome ou e-mail usando `busca` na URL. |
 | Editar | Altera nome, e-mail, perfil, status e, se preenchida, a senha. |
 | Ativar/desativar | Alterna `is_active`. |
@@ -149,37 +154,25 @@ A imagem abaixo mostra o diagrama entidade-relacionamento (DER) do banco, eviden
 
 ### Tabelas usadas hoje pelo PHP
 
-| Tabela | Quem usa | Finalidade |
-| --- | --- | --- |
-| `users_login` | `Auth.php`, `painel.php`, `crud.php` | Contas, senhas com hash, perfis e status de acesso. |
-| `pedidos` | `pedidos.php`, `cozinha.php`, `garcom.php`, `Pedidos.php` | Mesa, valor total, status de pagamento, status de preparo e data de criação. É criada/atualizada automaticamente ao abrir essas telas. |
-| `produtos` | `cardapio.php`, `garcom.php`, `Cardapio.php` | Pratos, descrições, preços e disponibilidade. |
-| `pedido_itens` | `garcom.php`, `cozinha.php`, `pedidos.php`, `Cardapio.php` | Itens, quantidades e preço de cada prato no momento do pedido. |
+| Tabela | Colunas principais | Quem usa | Finalidade |
+| --- | --- | --- | --- |
+| `users_login` | `username`, `email`, `password_hash`, `role`, `is_active`, `failed_attempts`, `locked_until` | `Auth.php`, `painel.php`, `crud.php` | Contas, senhas com hash, perfis, status de acesso e controle de tentativas de login. |
+| `mesas` | `numero`, `capacidade`, `status`, `hora_reserva`, `reservado_por`, `tel_reserva` | `pedidos.php`, `garcom.php` | Cadastro de mesas físicas. Os campos de reserva existem no banco, mas ainda não têm tela própria. |
+| `pedidos` | `mesa_id` (FK), `status_pagamento`, `status_preparo`, `criado_em` | `pedidos.php`, `cozinha.php`, `garcom.php`, `Pedidos.php` | Cabeçalho do pedido: mesa, status de pagamento e de preparo. Não guarda valor total diretamente. |
+| `produtos` | `nome`, `tipo_id` (FK), `categoria_id` (FK), `preco`, `descricao`, `ativo` | `cardapio.php`, `garcom.php`, `Cardapio.php` | Pratos, classificação por tipo/categoria, preços e disponibilidade. |
+| `pedido_itens` | `pedido_id` (FK), `produto_id` (FK), `quantidade`, `preco_unitario` | `garcom.php`, `cozinha.php`, `pedidos.php`, `Cardapio.php` | Itens de cada pedido, com preço congelado no momento da venda — é daqui que vem o valor total do pedido. |
+| `categorias_produto` / `tipos_produto` | `nome` | `cardapio.php` | Tabelas de referência usadas na classificação dos pratos. |
+| `login_audit` | `user_id` (FK), `ip_address`, `success`, `reason` | Criada pelo SQL; ainda não amplamente usada pelo PHP atual | Estrutura pronta para auditoria de tentativas de login. |
 
-### Tabelas previstas em `mesa.sql`, mas ainda sem uso no PHP
+### Modelo de pedidos
 
-| Tabela | Finalidade prevista |
-| --- | --- |
-| `categorias_produto` | Categorias específicas do cardápio. |
-| `tipos_produto` | Tipos gerais de produto. |
-| `produtos` | Itens do cardápio e preços. |
-| `tables` | Mesas físicas e reservas. |
-| `comandapedidos` | Pedidos ligados a mesas e produtos. |
-| `login_audit` | Histórico de tentativas de login. |
-
-Essas tabelas fazem parte do modelo do restaurante, mas a interface atual ainda não oferece telas nem consultas para elas. Também não há, no PHP atual, uso de `failed_attempts`, `locked_until` ou `login_audit`.
-
-### Instalação do banco
-
-1. Crie o banco `restaurante` no MySQL.
-2. Importe `restaurante.sql`.
-
-O usuário inicial definido no SQL é `administrador@email.com`. A senha descrita no arquivo é `administrador`.
+O sistema já usa um único modelo, em formato cabeçalho/detalhe: `pedidos` guarda a mesa e os status, e `pedido_itens` guarda cada prato pedido, com quantidade e preço no momento da venda. Não existe mais uma tabela paralela de "comanda" — se esse nome aparecer em código ou em versões antigas da documentação, refere-se a este mesmo par de tabelas.
 
 ## Proteções já presentes
 
 - PDO com consultas preparadas nas partes que recebem dados do usuário;
 - `password_hash()` e `password_verify()` para senhas;
+- estrutura de bloqueio de conta por tentativas falhas (`failed_attempts`, `locked_until` em `users_login`) — **⚠ confirmar se já está sendo aplicada em `Auth::login()`**;
 - validação de e-mail, ID e valores antes das gravações;
 - `htmlspecialchars()` ao imprimir dados variáveis na tela;
 - página de funcionários protegida para administradores;
@@ -187,9 +180,10 @@ O usuário inicial definido no SQL é `administrador@email.com`. A senha descrit
 
 ## Pontos importantes para manutenção
 
-- O painel permite que qualquer usuário autenticado altere o e-mail de qualquer conta listada. Isso é o comportamento atual de `painel.php`.
-- A tela de pedidos usa a tabela simples `pedidos`; ela contém mesa, valor e pagamento. A classe `Pedidos` atualiza instalações antigas que possuíam essa tabela sem mesa e pagamento.
-- Há dois modelos de pedido: `pedidos` (usado pela interface atual) e `comandapedidos` (previsto no banco, mas ainda não usado). Antes de criar uma cozinha/comanda detalhada, escolha e mantenha apenas um modelo.
+- **Edição de e-mail sem restrição:** o painel permite que qualquer usuário autenticado altere o e-mail de qualquer conta listada. Isso é o comportamento atual de `painel.php` e é uma falha de controle de acesso a corrigir — só administrador (ou o próprio usuário) deveria poder editar e-mail de conta.
+- **Valor do pedido:** `pedidos` não tem coluna de total; o valor exibido em `pedidos.php` provavelmente vem de uma soma sobre `pedido_itens`. Vale confirmar essa lógica antes de qualquer alteração no schema.
+- **Mesas com dados de reserva ociosos:** `mesas` já tem `status`, `hora_reserva`, `reservado_por` e `tel_reserva`, mas nenhuma tela usa esses campos hoje. É um recurso pronto no banco, mas não implementado na interface.
+- **Erro de digitação nos dados semente:** o `restaurante.sql` cadastra `recepcao@email.comm` (com "m" duplicado). Vale corrigir esse e-mail no script antes de reimportar o banco.
 - `templates/index.php` foi mantido apenas para redirecionar links antigos ao painel atual.
 - As credenciais do MySQL estão em `config/conexao.php`. Em produção, use usuário próprio do banco e uma senha forte.
 
@@ -197,5 +191,7 @@ O usuário inicial definido no SQL é `administrador@email.com`. A senha descrit
 
 1. Inicie Apache e MySQL no XAMPP.
 2. Configure as credenciais de banco em `config/conexao.php` se necessário.
-3. Crie o banco e importe `mesa.sql`, aplicando a migração desta documentação.
+3. Crie o banco e importe `restaurante.sql` (a criação do banco `restaurante` já está incluída no script).
 4. Abra `http://localhost/restauranteSteelTeam/templates/login.php`.
+
+O usuário inicial definido no SQL é `admin@email.com`, perfil administrador.

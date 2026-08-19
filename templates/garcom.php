@@ -384,7 +384,7 @@ try {
 
                             <label for="busca-cardapio">Buscar item</label>
                             <input type="search" id="busca-cardapio" class="campo-formulario busca-cardapio" placeholder="Digite o nome do prato..." autocomplete="off">
-                            <div class="itens-cardapio">
+                            <div class="itens-cardapio" style="height: 360px; max-height: 52vh; overflow-x: hidden; overflow-y: scroll;">
                                 <?php foreach ($produtosCardapio as $produto): ?>
                                     <div class="item-cardapio" data-nome="<?php echo htmlspecialchars($produto['nome'], ENT_QUOTES, 'UTF-8'); ?>">
                                         <div>
@@ -405,31 +405,35 @@ try {
             </aside>
         </section>
     </main>
-    <script>
-        const buscaCardapio = document.querySelector('#busca-cardapio');
-        const itensCardapio = document.querySelectorAll('.item-cardapio');
-        const semResultados = document.querySelector('.cardapio-sem-resultados');
+        <script>
+            const buscaCardapio = document.querySelector('#busca-cardapio');
+            const itensCardapio = document.querySelectorAll('.item-cardapio');
+            const semResultados = document.querySelector('.cardapio-sem-resultados');
 
-        buscaCardapio?.addEventListener('input', (evento) => {
-            const termo = evento.target.value
-                .toLocaleLowerCase('pt-BR')
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '');
-            let itensVisiveis = 0;
-
-            itensCardapio.forEach((item) => {
-                const nome = item.dataset.nome
+            buscaCardapio?.addEventListener('input', (evento) => {
+                const termo = evento.target.value
                     .toLocaleLowerCase('pt-BR')
                     .normalize('NFD')
                     .replace(/[\u0300-\u036f]/g, '');
-                const corresponde = nome.includes(termo);
+                let itensVisiveis = 0;
 
-                item.hidden = !corresponde;
-                if (corresponde) itensVisiveis += 1;
+                itensCardapio.forEach((item) => {
+                    const nome = item.dataset.nome
+                        .toLocaleLowerCase('pt-BR')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '');
+                    const corresponde = nome.includes(termo);
+
+                    // Em vez de usar .hidden, forçamos o CSS a esconder o elemento
+                    item.style.display = corresponde ? '' : 'none';
+                    
+                    if (corresponde) itensVisiveis += 1;
+                });
+
+                if (semResultados) {
+                    semResultados.style.display = itensVisiveis > 0 ? 'none' : 'block';
+                }
             });
-
-            if (semResultados) semResultados.hidden = itensVisiveis > 0;
-        });
-    </script>
+        </script>
 </body>
 </html>

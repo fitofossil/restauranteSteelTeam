@@ -1,0 +1,399 @@
+/* =============================================================
+   DOGÃO LANCHES — Estilo Unificado
+   =============================================================
+   Paleta: marrons escuros, dourados, creme.
+   Fontes: DM Sans (corpo) / Playfair Display (títulos).
+   ============================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap');
+
+/* --- RESET E BASE --- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    min-height: 100vh;
+    color: #f6ead8;
+    font-family: 'DM Sans', sans-serif;
+    background-color: #1a120d;
+    background-image: linear-gradient(rgba(22, 12, 8, .58), rgba(22, 12, 8, .72)),
+                      url('../../img/dog%C3%A3olanches.jpg');
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 17, 12, 0.12);
+    pointer-events: none;
+    z-index: 0;
+}
+main, .painel, .login-container, .bloco, .card, .caixa {
+    position: relative;
+    z-index: 1;
+}
+h1, h2 { font-family: 'Playfair Display', Georgia, serif; }
+a { color: inherit; }
+
+/* =============================================================
+   LOGIN
+   ============================================================= */
+.login-container {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.login-card {
+    width: 380px;
+    background: rgba(91, 57, 32, 0.92);
+    border: 8px solid rgba(139, 90, 43, 0.95);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 0 40px rgba(0,0,0,.45), inset 0 0 20px rgba(255,255,255,.08);
+    backdrop-filter: blur(1.5px);
+}
+.login-card h1 {
+    text-align: center;
+    color: #FFD700;
+    font-size: 42px;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+}
+.login-card .subtitulo {
+    text-align: center;
+    color: #f5deb3;
+    margin-bottom: 35px;
+    font-size: .95rem;
+}
+.login-card input {
+    width: 100%;
+    padding: 15px;
+    margin-bottom: 18px;
+    border: none;
+    border-radius: 6px;
+    background: #c8a165;
+    color: #2f1b0d;
+    font-size: 17px;
+    font-family: inherit;
+}
+.login-card input::placeholder { color: #4d2f18; }
+.login-card input:focus { outline: 2px solid #FFD700; outline-offset: 2px; }
+.login-card button {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    background: #b8860b;
+    color: white;
+    font-size: 20px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: .3s;
+}
+.login-card button:hover { background: #daa520; transform: scale(1.03); }
+.erro {
+    margin-top: 20px;
+    text-align: center;
+    color: #ff5555;
+    font-weight: bold;
+}
+
+/* =============================================================
+   PAINEL / CRUD — LAYOUT COMUM
+   ============================================================= */
+.painel { max-width: 1280px; margin: auto; padding: 46px 24px 64px; }
+
+/* --- CABEÇALHO --- */
+.topo { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 30px; color: #fff6e6; }
+.marca, .etiqueta { margin: 0; color: #f1bd4c; font-size: .72rem; font-weight: 700; letter-spacing: .16em; }
+h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 6px 0; }
+h2 { font-size: 1.55rem; margin: 6px 0; }
+.boas-vindas { margin: 0; color: #dfcdb4; }
+
+/* Botões do cabeçalho */
+.topo-botoes { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+.btn-topo {
+    border: 1px solid #c69a47;
+    border-radius: 8px;
+    padding: 10px 17px;
+    color: #ffe0a0;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: .9rem;
+    transition: background .2s;
+}
+.btn-topo:hover { background: rgba(198, 154, 71, .2); }
+.btn-topo.destaque { background: rgba(217, 159, 40, .18); }
+
+/* =============================================================
+   ALERTAS
+   ============================================================= */
+.alerta { margin: 0 0 20px; padding: 13px 16px; border-radius: 8px; font-weight: 600; }
+.alerta.sucesso { background: #d9f0dc; color: #195c2a; }
+.alerta.erro { background: #f9d9d5; color: #8b2218; }
+
+/* =============================================================
+   CARDS DE RESUMO
+   ============================================================= */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 24px; }
+.cards.cards-uma { grid-template-columns: minmax(220px, 320px); }
+.cards.cozinha-cards { grid-template-columns: repeat(2, minmax(220px, 320px)); }
+.card {
+    display: flex; gap: 14px; align-items: center; padding: 22px;
+    background: rgba(247, 236, 220, 0.88);
+    border: 1px solid rgba(198, 162, 110, 0.9);
+    border-radius: 13px;
+    box-shadow: 0 14px 28px rgba(0,0,0,.18);
+    backdrop-filter: blur(1.5px);
+}
+.card span.icone {
+    display: grid; place-items: center; width: 48px; height: 48px;
+    border-radius: 50%; background: #f5e3bd; font-size: 1.45rem;
+}
+.card p { margin: 0 0 3px; color: #2d1c12; font-size: .88rem; font-weight: 600; }
+.card strong { font-size: 1.55rem; color: #1b120d; }
+
+/* =============================================================
+   GRADE DE 2 COLUNAS
+   ============================================================= */
+.grade { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, .9fr); gap: 24px; }
+.grade.pedidos-grade { grid-template-columns: minmax(0, 1.6fr) minmax(300px, .9fr); }
+.grade.garcom-grade { grid-template-columns: minmax(0, 1.6fr) minmax(300px, .9fr); }
+.grade.pedidos-leitura { grid-template-columns: 1fr; }
+.bloco {
+    background: rgba(244, 232, 214, 0.88); border: 1px solid rgba(198, 162, 110, 0.9); border-radius: 13px;
+    box-shadow: 0 14px 28px rgba(0,0,0,.18); padding: 26px;
+    backdrop-filter: blur(1.5px);
+}
+.bloco h2, .formulario-card h2, .titulo-bloco h2 {
+    color: #120d09;
+    font-weight: 800;
+}
+.titulo-bloco {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #e8dbc5; padding-bottom: 20px; margin-bottom: 20px;
+}
+.titulo-bloco > span { color: #1a120d; font-size: .85rem; font-weight: 800; }
+.titulo-acoes { display: flex; align-items: center; gap: 12px; }
+.titulo-acoes form { margin: 0; }
+
+/* =============================================================
+   LISTA DE USUÁRIOS (painel)
+   ============================================================= */
+.lista-usuarios { display: grid; }
+.linha-usuario {
+    display: grid; grid-template-columns: 42px minmax(95px, .65fr) minmax(160px, 1.35fr) auto;
+    gap: 12px; align-items: center; padding: 16px 0; border-bottom: 1px solid #eee4d4;
+}
+.linha-usuario:last-child { border: 0; padding-bottom: 0; }
+.avatar {
+    display: grid; place-items: center; height: 38px; border-radius: 50%;
+    background: #5b3920; color: #ffd56a; font-family: Georgia, serif; font-weight: bold;
+}
+.nome { display: grid; gap: 2px; }
+.nome strong { color: #120d09; font-weight: 800; }
+.nome small { color: #2f6d38; font-size: .75rem; font-weight: 700; }
+.email-usuario { color: #140f0c; font-weight: 700; }
+.linha-usuario input {
+    width: 100%; border: 1px solid #d8c3a0; border-radius: 7px;
+    background: #fffdf8; color: #3b2618; padding: 10px; font: inherit;
+}
+.linha-usuario button {
+    border: 0; border-radius: 7px; padding: 10px 13px; background: #f2e4c7;
+    color: #5b3920; font: 700 .82rem 'DM Sans', sans-serif; cursor: pointer;
+}
+.linha-usuario button:hover { background: #e8ca8c; }
+
+/* =============================================================
+   BLOCO CAIXA
+   ============================================================= */
+.caixa { align-self: start; background: rgba(91, 57, 32, 0.92); color: #fff7e7; border-color: rgba(167, 114, 54, 0.9); }
+.caixa h2 { margin-top: 7px; }
+.descricao { color: #e6cfab; line-height: 1.5; margin: 12px 0 25px; }
+.caixa label { display: block; margin-bottom: 8px; font-size: .86rem; font-weight: 600; }
+.campo-valor {
+    display: flex; align-items: center; padding-left: 13px;
+    background: #fffaf0; border: 1px solid #d8c3a0; border-radius: 7px; overflow: hidden;
+}
+.campo-valor span { color: #73563b; font-weight: 700; }
+.campo-valor input {
+    width: 100%; border: 0; outline: 0; padding: 14px 10px; background: transparent;
+    font: 1rem 'DM Sans', sans-serif; color: #3b2618;
+}
+
+/* =============================================================
+   BOTÕES PADRONIZADOS
+   ============================================================= */
+.botao-principal {
+    width: 100%; margin-top: 15px; border: 0; border-radius: 8px; padding: 14px;
+    background: #d99f28; color: #fff; font: 700 1rem 'DM Sans', sans-serif;
+    cursor: pointer; transition: background .2s;
+}
+.botao-principal:hover { background: #efb43b; }
+
+/* =============================================================
+   BUSCA
+   ============================================================= */
+.busca { display: flex; gap: 10px; margin-bottom: 24px; align-items: center; }
+.busca input {
+    flex: 1; padding: 12px 16px; border: 1px solid #d8c3a0; border-radius: 8px;
+    background: #fffdf8; color: #120d09; font: inherit; font-size: .95rem; font-weight: 700;
+}
+.busca input:focus { outline: 2px solid #d99f28; outline-offset: 1px; }
+.busca button {
+    border: 0; border-radius: 8px; padding: 12px 22px; background: #d99f28;
+    color: #fff; font: 700 .95rem 'DM Sans', sans-serif; cursor: pointer; transition: background .2s;
+}
+.busca button:hover { background: #efb43b; }
+.limpar { color: #c69a47; text-decoration: none; font-weight: 600; font-size: .9rem; padding: 12px 8px; }
+.limpar:hover { text-decoration: underline; }
+
+/* =============================================================
+   TABELA
+   ============================================================= */
+.vazio { text-align: center; color: #120d09; padding: 40px 0; font-size: .95rem; font-weight: 800; }
+.tabela-wrap { overflow-x: auto; }
+.tabela { width: 100%; border-collapse: collapse; font-size: .88rem; color: #120d09; }
+.tabela th {
+    text-align: left; padding: 10px; color: #120d09; font-weight: 900;
+    font-size: .76rem; letter-spacing: .06em; text-transform: uppercase;
+    border-bottom: 2px solid #e8dbc5;
+}
+.tabela td { padding: 12px 10px; border-bottom: 1px solid #eee4d4; vertical-align: middle; color: #120d09; font-weight: 800; }
+.tabela tr:last-child td { border-bottom: none; }
+.tabela tr:hover td { background: #fdf6e8; }
+.avatar-tabela {
+    display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+    background: #5b3920; color: #ffd56a; font-family: Georgia, serif; font-weight: bold; font-size: .9rem;
+}
+.nome-func { font-weight: 800; color: #120d09; }
+.email-func { color: #1b120d; font-size: .82rem; font-weight: 700; }
+
+/* =============================================================
+   BADGES DE PERFIL
+   ============================================================= */
+.badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: .74rem; font-weight: 800; white-space: nowrap; }
+.badge.perfil-1 { background: #f9d9d5; color: #8b2218; }
+.badge.perfil-2 { background: #f5e3bd; color: #7a5a1e; }
+.badge.perfil-3 { background: #dbeafe; color: #1d4ed8; }
+.badge.perfil-4 { background: #f1e0ff; color: #6b2185; }
+.badge.pagamento-pago { background: #d9f0dc; color: #195c2a; }
+.badge.pagamento-pendente { background: #f5e3bd; color: #7a5a1e; }
+.badge.preparo-aguardando { background: #fff0c9; color: #7a4c00; }
+.badge.preparo-pronto { background: #d9f0dc; color: #195c2a; }
+.badge.log-insert { background: #d9f0dc; color: #195c2a; }
+.badge.log-update { background: #dbeafe; color: #1d4ed8; }
+.badge.log-delete { background: #f9d9d5; color: #8b2218; }
+
+/* =============================================================
+   STATUS (Ativar / Desativar)
+   ============================================================= */
+.status-btn {
+    border: 0; border-radius: 20px; padding: 4px 12px;
+    font: 800 .76rem 'DM Sans', sans-serif; cursor: pointer; transition: opacity .2s;
+}
+.status-btn.ativo { background: #d9f0dc; color: #195c2a; }
+.status-btn.inativo { background: #f9d9d5; color: #8b2218; }
+.status-btn:hover { opacity: .8; }
+
+/* =============================================================
+   BOTÕES DE AÇÃO
+   ============================================================= */
+.acoes { white-space: nowrap; display: flex; gap: 8px; align-items: center; }
+.btn-editar {
+    border: 1px solid #d99f28; border-radius: 6px; padding: 6px 12px;
+    color: #7a5a1e; text-decoration: none; font-weight: 600; font-size: .8rem;
+    background: #fdf3dc; transition: background .2s;
+}
+.btn-editar:hover { background: #f5e3bd; }
+.btn-excluir {
+    border: 0; border-radius: 6px; padding: 6px 12px; background: #f9d9d5;
+    color: #8b2218; font: 600 .8rem 'DM Sans', sans-serif; cursor: pointer; transition: background .2s;
+}
+.btn-excluir:hover { background: #f2b8b1; }
+.btn-zerar { width: 100%; margin-top: 4px; padding: 12px; }
+.formulario-perigo { border-color: #e3a29c; }
+.inline { display: inline; }
+.mesa-cozinha { font-weight: 900; color: #120d09; }
+.btn-pronto, .btn-voltar-preparo {
+    border: 0; border-radius: 6px; padding: 7px 12px; font: 700 .8rem 'DM Sans', sans-serif;
+    cursor: pointer; transition: background .2s;
+}
+.btn-pronto { background: #d9f0dc; color: #195c2a; }
+.btn-pronto:hover { background: #bce1c2; }
+.btn-voltar-preparo { background: #f5e3bd; color: #7a5a1e; }
+.btn-voltar-preparo:hover { background: #e8ca8c; }
+.itens-cardapio { display: grid; gap: 9px; margin: 0 0 14px; }
+.item-cardapio {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px; border: 1px solid #d8c3a0; border-radius: 8px;
+    background: #fffdf8; color: #120d09;
+}
+.item-cardapio div { display: grid; gap: 3px; }
+.item-cardapio strong { color: #120d09; font-weight: 900; }
+.item-cardapio small { color: #2e2019; font-weight: 700; }
+.item-cardapio span { color: #120d09; font-size: .84rem; font-weight: 900; }
+.item-cardapio input {
+    width: 62px; margin: 0 !important; background: #fff; color: #120d09;
+    border: 1px solid #d8c3a0; border-radius: 6px; padding: 8px 6px;
+    font-weight: 700;
+}
+
+/* =============================================================
+   FORMULÁRIOS
+   ============================================================= */
+.formularios { display: flex; flex-direction: column; gap: 20px; align-self: start; }
+.formulario-card {
+    padding: 22px; background: #fffaf1; border: 1px solid #dfc69d;
+    border-radius: 13px; box-shadow: 0 14px 28px rgba(0,0,0,.18);
+}
+.formulario-card h2 { margin-bottom: 14px; }
+.formulario-card p:not(.etiqueta) { color: #120d09; line-height: 1.5; margin: 0 0 14px; font-size: .9rem; font-weight: 800; }
+.formulario-card label { display: block; margin-bottom: 6px; font-size: .85rem; font-weight: 900; color: #120d09; }
+.formulario-card input[type="text"],
+.formulario-card input[type="email"],
+.formulario-card input[type="password"],
+.formulario-card input[type="number"],
+.formulario-card select {
+    width: 100%; border: 1px solid #d8c3a0; border-radius: 7px;
+    background: #fffdf8; color: #1b120d; padding: 10px 12px; font: inherit; margin-bottom: 12px;
+    font-weight: 600;
+}
+.formulario-card input:focus,
+.formulario-card select:focus { outline: 2px solid #d99f28; outline-offset: 1px; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px; }
+.checkbox-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: #d99f28; cursor: pointer; margin: 0; }
+.btn-cancelar {
+    display: block; text-align: center; margin-top: 10px; color: #1d120d;
+    text-decoration: none; font-weight: 700; font-size: .9rem; padding: 10px;
+    border-radius: 8px; transition: background .2s;
+}
+.btn-cancelar:hover { background: #f0e4cf; }
+
+/* =============================================================
+   RESPONSIVIDADE
+   ============================================================= */
+@media (max-width: 760px) {
+    .painel { padding: 30px 16px; }
+    .cards, .cards.cards-uma { grid-template-columns: 1fr; }
+    .grade { grid-template-columns: 1fr; }
+    .topo { gap: 16px; }
+    .topo-botoes { flex-wrap: wrap; }
+    .linha-usuario { grid-template-columns: 42px 1fr auto; }
+    .linha-usuario input { grid-column: 2 / -1; }
+    .linha-usuario button { grid-column: 3; }
+    .acoes { flex-direction: column; gap: 4px; }
+    .tabela { font-size: .8rem; }
+    .tabela th, .tabela td { padding: 8px 6px; }
+}
+@media (max-width: 420px) {
+    .topo { display: block; }
+    .topo-botoes { margin-top: 16px; }
+    .busca { flex-wrap: wrap; }
+    .busca input { min-width: 0; }
+    .card { padding: 17px; }
+    .bloco { padding: 19px; }
+}

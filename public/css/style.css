@@ -8,7 +8,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap');
 
 /* --- RESET E BASE --- */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 1; }
 body {
     min-height: 100vh;
     color: #f6ead8;
@@ -119,7 +119,7 @@ h2 { font-size: 1.55rem; margin: 6px 0; }
     border: 1px solid #c69a47;
     border-radius: 8px;
     padding: 10px 17px;
-    color: #ffe0a0;
+    color: #daa83f;
     text-decoration: none;
     font-weight: 600;
     font-size: .9rem;
@@ -353,17 +353,26 @@ h2 { font-size: 1.55rem; margin: 6px 0; }
 .formulario-card h2 { margin-bottom: 14px; }
 .formulario-card p:not(.etiqueta) { color: #120d09; line-height: 1.5; margin: 0 0 14px; font-size: .9rem; font-weight: 800; }
 .formulario-card label { display: block; margin-bottom: 6px; font-size: .85rem; font-weight: 900; color: #120d09; }
+
+.label-com-espaco { margin-top: 20px; } /* Correção aplicada aqui */
+
 .formulario-card input[type="text"],
 .formulario-card input[type="email"],
 .formulario-card input[type="password"],
 .formulario-card input[type="number"],
-.formulario-card select {
+.formulario-card input[type="search"], /* Correção aplicada aqui */
+.formulario-card select,
+.formulario-card textarea {            /* Correção aplicada aqui */
     width: 100%; border: 1px solid #d8c3a0; border-radius: 7px;
     background: #fffdf8; color: #1b120d; padding: 10px 12px; font: inherit; margin-bottom: 12px;
-    font-weight: 600;
+    font-weight: 600; font-family: 'DM Sans', sans-serif; resize: vertical;
 }
 .formulario-card input:focus,
-.formulario-card select:focus { outline: 2px solid #d99f28; outline-offset: 1px; }
+.formulario-card select:focus,
+.formulario-card textarea:focus {      /* Correção aplicada aqui */
+    outline: 2px solid #d99f28; outline-offset: 1px; 
+}
+
 .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px; }
 .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: #d99f28; cursor: pointer; margin: 0; }
 .btn-cancelar {

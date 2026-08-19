@@ -18,8 +18,8 @@ $port = "3306";
 
 // nome do banco de dados
 $dbname = "restaurante";
-$user = "admin";
-$password = "admin123";
+$user = "root";
+$password = "";
 
 try {
     // PDO centraliza as consultas e lança exceções quando o banco retorna erro.

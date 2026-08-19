@@ -380,11 +380,13 @@ try {
                             <?php endif; ?>
 
                             <label for="observacao" style="margin-top: 12px;">Observação para a cozinha / embalagem</label>
-                            <textarea id="observacao" name="observacao" rows="3" placeholder="Ex.: sem molho, bem quente, para viagem, embalagem em caixa, entrega em 20 min... "><?php echo htmlspecialchars($observacao); ?></textarea>
+                            <textarea id="observacao" name="observacao" class="campo-formulario" rows="3" placeholder="Ex.: sem molho, bem quente, para viagem, embalagem em caixa, entrega em 20 min... "><?php echo htmlspecialchars($observacao); ?></textarea>
 
+                            <label for="busca-cardapio">Buscar item</label>
+                            <input type="search" id="busca-cardapio" class="campo-formulario busca-cardapio" placeholder="Digite o nome do prato..." autocomplete="off">
                             <div class="itens-cardapio">
                                 <?php foreach ($produtosCardapio as $produto): ?>
-                                    <div class="item-cardapio">
+                                    <div class="item-cardapio" data-nome="<?php echo htmlspecialchars($produto['nome'], ENT_QUOTES, 'UTF-8'); ?>">
                                         <div>
                                             <strong><?php echo htmlspecialchars($produto['nome']); ?></strong>
                                             <small><?php echo htmlspecialchars($produto['descricao']); ?></small>
@@ -393,6 +395,7 @@ try {
                                         <input type="number" name="quantidades[<?php echo (int) $produto['id']; ?>]" min="0" max="99" value="<?php echo (int) ($_POST['quantidades'][$produto['id']] ?? 0); ?>" aria-label="Quantidade de <?php echo htmlspecialchars($produto['nome']); ?>">
                                     </div>
                                 <?php endforeach; ?>
+                                <p class="cardapio-sem-resultados" aria-live="polite" hidden>Nenhum item encontrado.</p>
                             </div>
 
                             <button type="submit" name="adicionar_pedido" class="botao-principal">Enviar pedido</button>
@@ -402,5 +405,31 @@ try {
             </aside>
         </section>
     </main>
+    <script>
+        const buscaCardapio = document.querySelector('#busca-cardapio');
+        const itensCardapio = document.querySelectorAll('.item-cardapio');
+        const semResultados = document.querySelector('.cardapio-sem-resultados');
+
+        buscaCardapio?.addEventListener('input', (evento) => {
+            const termo = evento.target.value
+                .toLocaleLowerCase('pt-BR')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+            let itensVisiveis = 0;
+
+            itensCardapio.forEach((item) => {
+                const nome = item.dataset.nome
+                    .toLocaleLowerCase('pt-BR')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '');
+                const corresponde = nome.includes(termo);
+
+                item.hidden = !corresponde;
+                if (corresponde) itensVisiveis += 1;
+            });
+
+            if (semResultados) semResultados.hidden = itensVisiveis > 0;
+        });
+    </script>
 </body>
 </html>

@@ -272,7 +272,7 @@ try {
                                                 <!-- Form dinâmico para exclusão segura -->
                                                 <form method="POST" class="inline" onsubmit="return confirm('Tem certeza que deseja excluir o prato \'<?php echo addslashes($produto['nome']); ?>\' do cardápio?');">
                                                     <input type="hidden" name="produto_id" value="<?php echo (int) $produto['id']; ?>">
-                                                    <button name="deletar_produto" class="btn-cancelar" style="padding: 4px 8px; font-size: 0.85em; margin: 0; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Excluir</button>
+                                                    <button name="deletar_produto" class="btn-excluir">Excluir</button>
                                                 </form>
                                             </div>
                                         </td>
@@ -298,10 +298,10 @@ try {
                         <?php endif; ?>
 
                         <label for="nome">Nome do prato</label>
-                        <input id="nome" name="nome" maxlength="100" value="<?php echo htmlspecialchars($produtoEditando['nome'] ?? ($_POST['nome'] ?? '')); ?>" required>
+                        <input type="text" class="campo-formulario" id="nome" name="nome" maxlength="100" value="<?php echo htmlspecialchars($produtoEditando['nome'] ?? ($_POST['nome'] ?? '')); ?>" required>
 
                         <label for="categoria_id">Categoria</label>
-                        <select id="categoria_id" name="categoria_id" required>
+                        <select class="campo-formulario" id="categoria_id" name="categoria_id" required>
                             <option value="">Selecione</option>
                             <?php foreach ($categorias as $categoria): ?>
                                 <option value="<?php echo (int) $categoria['id']; ?>" <?php echo (($produtoEditando['categoria_id'] ?? ($_POST['categoria_id'] ?? '')) == $categoria['id']) ? 'selected' : ''; ?>>
@@ -311,7 +311,7 @@ try {
                         </select>
 
                         <label for="tipo_id">Tipo</label>
-                        <select id="tipo_id" name="tipo_id" required>
+                        <select class="campo-formulario" id="tipo_id" name="tipo_id" required>
                             <option value="">Selecione</option>
                             <?php foreach ($tipos as $tipo): ?>
                                 <option value="<?php echo (int) $tipo['id']; ?>" <?php echo (($produtoEditando['tipo_id'] ?? ($_POST['tipo_id'] ?? '')) == $tipo['id']) ? 'selected' : ''; ?>>
@@ -321,10 +321,10 @@ try {
                         </select>
 
                         <label for="descricao">Descrição</label>
-                        <input id="descricao" name="descricao" maxlength="255" value="<?php echo htmlspecialchars($produtoEditando['descricao'] ?? ($_POST['descricao'] ?? '')); ?>" placeholder="Ex.: pão, salsicha, molho e queijo">
+                        <input type="text" class="campo-formulario" id="descricao" name="descricao" maxlength="255" value="<?php echo htmlspecialchars($produtoEditando['descricao'] ?? ($_POST['descricao'] ?? '')); ?>" placeholder="Ex.: pão, salsicha, molho e queijo">
 
                         <label for="preco">Preço</label>
-                        <input id="preco" name="preco" inputmode="decimal" value="<?php echo htmlspecialchars($produtoEditando['preco'] ?? ($_POST['preco'] ?? '')); ?>" placeholder="0,00" required>
+                        <input type="text" class="campo-formulario" id="preco" name="preco" inputmode="decimal" value="<?php echo htmlspecialchars($produtoEditando['preco'] ?? ($_POST['preco'] ?? '')); ?>" placeholder="0,00" required>
 
                         <?php if ($produtoEditando): ?>
                             <label class="checkbox-label">
@@ -349,7 +349,7 @@ try {
                     <h2>Cadastrar categoria</h2>
                     <form method="POST">
                         <label for="nome_categoria">Nome da categoria</label>
-                        <input id="nome_categoria" name="nome_categoria" maxlength="50" required>
+                        <input type="text" class="campo-formulario" id="nome_categoria" name="nome_categoria" maxlength="50" required>
                         <button class="botao-principal" name="adicionar_categoria">Salvar categoria</button>
                     </form>
                 </div>
@@ -360,7 +360,7 @@ try {
                     <h2>Cadastrar tipo</h2>
                     <form method="POST">
                         <label for="nome_tipo">Nome do tipo</label>
-                        <input id="nome_tipo" name="nome_tipo" maxlength="50" required>
+                        <input type="text" class="campo-formulario" id="nome_tipo" name="nome_tipo" maxlength="50" required>
                         <button class="botao-principal" name="adicionar_tipo">Salvar tipo</button>
                     </form>
                 </div>

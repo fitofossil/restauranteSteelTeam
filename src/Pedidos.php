@@ -41,6 +41,10 @@ class Pedidos
             $conn->exec('ALTER TABLE pedidos ADD COLUMN mesa_numero SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER id');
         }
 
+        if (!self::colunaExiste($conn, 'valor')) {
+            $conn->exec('ALTER TABLE pedidos ADD COLUMN valor DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER mesa_numero');
+        }
+
         if (!self::colunaExiste($conn, 'status_pagamento')) {
             $conn->exec("ALTER TABLE pedidos ADD COLUMN status_pagamento VARCHAR(10) NOT NULL DEFAULT 'pendente' AFTER valor");
         }

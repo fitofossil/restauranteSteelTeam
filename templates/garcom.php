@@ -304,10 +304,10 @@ try {
                         <p>Não há pratos disponíveis. Peça ao gerente ou administrador para cadastrar o cardápio.</p>
                     <?php else: ?>
                         <form method="POST">
-                            <div style="margin-bottom: 16px;">
+                            <div class="pedido-tipo">
                                 <label for="tipo_entrega">Tipo do pedido</label>
-                                <div style="display: flex; gap: 10px; align-items: end;">
-                                    <select id="tipo_entrega" name="tipo_entrega" style="flex: 1;">
+                                <div class="pedido-tipo-controles">
+                                    <select id="tipo_entrega" name="tipo_entrega" class="pedido-tipo-select">
                                         <option value="mesa" <?php echo ($tipoPedidoSelecionado === Pedidos::TIPO_MESA) ? 'selected' : ''; ?>>Mesa</option>
                                         <option value="viagem" <?php echo ($tipoPedidoSelecionado === Pedidos::TIPO_VIAGEM) ? 'selected' : ''; ?>>Para viagem</option>
                                         <option value="entrega" <?php echo ($tipoPedidoSelecionado === Pedidos::TIPO_ENTREGA) ? 'selected' : ''; ?>>Entrega</option>
@@ -317,7 +317,7 @@ try {
                             </div>
 
                             <?php if ($tipoPedidoSelecionado === Pedidos::TIPO_MESA): ?>
-                                <div style="margin-top: 12px; padding: 12px; border: 1px solid #e4d7c8; background: #fffaf4; border-radius: 10px;">
+                                <div class="pedido-contexto">
                                     <p class="etiqueta">ATENDIMENTO NA MESA</p>
                                     <label for="mesa_numero">Número da mesa</label>
                                     <input id="mesa_numero" type="number" name="mesa_numero" min="1" max="999" value="<?php echo htmlspecialchars((string) ($_POST['mesa_numero'] ?? 1)); ?>" required>
@@ -325,32 +325,32 @@ try {
                             <?php endif; ?>
 
                             <?php if ($tipoPedidoSelecionado === Pedidos::TIPO_VIAGEM): ?>
-                                <div style="margin-top: 12px; padding: 12px; border: 1px solid #e4d7c8; background: #fffaf4; border-radius: 10px;">
+                                <div class="pedido-contexto">
                                     <p class="etiqueta">RETIRADA</p>
                                     <p>Pedido para retirada no balcão. Use a observação para orientar a cozinha sobre embalagem.</p>
                                 </div>
                             <?php endif; ?>
 
                             <?php if ($tipoPedidoSelecionado === Pedidos::TIPO_ENTREGA): ?>
-                                <div style="margin-top: 12px; padding: 12px; border: 1px solid #e4d7c8; background: #fffaf4; border-radius: 10px;">
+                                <div class="pedido-contexto">
                                     <p class="etiqueta">ENTREGA</p>
                                     <label for="cliente_nome">Nome do cliente</label>
                                     <input id="cliente_nome" type="text" name="cliente_nome" value="<?php echo htmlspecialchars($clienteNome); ?>" placeholder="Ex.: Maria Souza">
 
-                                    <div style="margin-top: 12px;">
+                                    <div class="campo-grupo">
                                         <label for="cep_entrega">CEP da entrega</label>
-                                        <div style="display: flex; gap: 10px; align-items: end;">
-                                            <input id="cep_entrega" type="text" name="cep_entrega" value="<?php echo htmlspecialchars($cepEntrega); ?>" placeholder="Digite o CEP" maxlength="9" style="flex: 1;">
+                                        <div class="campo-com-acao">
+                                            <input id="cep_entrega" type="text" name="cep_entrega" value="<?php echo htmlspecialchars($cepEntrega); ?>" placeholder="Digite o CEP" maxlength="9">
                                             <button type="submit" name="buscar_cep_entrega" class="btn-topo">Buscar CEP</button>
                                         </div>
                                     </div>
 
-                                    <div style="margin-top: 12px;">
+                                    <div class="campo-grupo">
                                         <label for="endereco_entrega">Rua / Logradouro</label>
                                         <input id="endereco_entrega" type="text" name="endereco_entrega" value="<?php echo htmlspecialchars($enderecoEntrega); ?>" placeholder="Rua, avenida...">
                                     </div>
 
-                                    <div style="display: grid; grid-template-columns: 1fr 120px; gap: 12px; margin-top: 12px;">
+                                    <div class="endereco-grid endereco-grid--numero">
                                         <div>
                                             <label for="bairro_endereco">Bairro</label>
                                             <input id="bairro_endereco" type="text" name="bairro_endereco" value="<?php echo htmlspecialchars($bairroEndereco); ?>" placeholder="Bairro">
@@ -361,7 +361,7 @@ try {
                                         </div>
                                     </div>
 
-                                    <div style="display: grid; grid-template-columns: 1fr 80px; gap: 12px; margin-top: 12px;">
+                                    <div class="endereco-grid endereco-grid--uf">
                                         <div>
                                             <label for="cidade_endereco">Cidade</label>
                                             <input id="cidade_endereco" type="text" name="cidade_endereco" value="<?php echo htmlspecialchars($cidadeEndereco); ?>" placeholder="Cidade">
@@ -372,14 +372,14 @@ try {
                                         </div>
                                     </div>
 
-                                    <div style="margin-top: 12px;">
+                                    <div class="campo-grupo">
                                         <label for="complemento_endereco">Complemento</label>
                                         <input id="complemento_endereco" type="text" name="complemento_endereco" value="<?php echo htmlspecialchars($complementoEndereco); ?>" placeholder="Apartamento, bloco, referência...">
                                     </div>
                                 </div>
                             <?php endif; ?>
 
-                            <label for="observacao" style="margin-top: 12px;">Observação para a cozinha / embalagem</label>
+                            <label for="observacao" class="label-com-espaco">Observação para a cozinha / embalagem</label>
                             <textarea id="observacao" name="observacao" class="campo-formulario" rows="3" placeholder="Ex.: sem molho, bem quente, para viagem, embalagem em caixa, entrega em 20 min... "><?php echo htmlspecialchars($observacao); ?></textarea>
 
                             <label for="busca-cardapio">Buscar item</label>

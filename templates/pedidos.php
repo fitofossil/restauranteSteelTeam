@@ -91,14 +91,24 @@ try {
     $queryPedidos = "
         SELECT p.id, 
                p.mesa_numero, 
-               p.status_pagamento, 
+               p.status_pagamento,
+               p.tipo_entrega,
+               p.observacao,
+               p.cliente_nome,
+               p.cep_entrega,
+               p.endereco_entrega,
+               p.numero_endereco,
+               p.complemento_endereco,
+               p.bairro_endereco,
+               p.cidade_endereco,
+               p.uf_endereco,
                p.criado_em,
                COALESCE(SUM(pi.preco_unitario * pi.quantidade), 0) AS valor,
                GROUP_CONCAT(CONCAT(pi.quantidade, 'x ', pr.nome) ORDER BY pi.id SEPARATOR ' • ') AS itens
         FROM pedidos p 
         LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id
         LEFT JOIN produtos pr ON pr.id = pi.produto_id
-        GROUP BY p.id, p.mesa_numero, p.status_pagamento, p.criado_em
+        GROUP BY p.id, p.mesa_numero, p.status_pagamento, p.tipo_entrega, p.observacao, p.cliente_nome, p.cep_entrega, p.endereco_entrega, p.numero_endereco, p.complemento_endereco, p.bairro_endereco, p.cidade_endereco, p.uf_endereco, p.criado_em
         ORDER BY p.criado_em ASC, p.id ASC
     ";
     
@@ -211,8 +221,10 @@ try {
                             <thead>
                                 <tr>
                                     <th>Pedido</th>
-                                    <th>Mesa</th>
+                                    <th>Tipo</th>
+                                    <th>Mesa / Retirada</th>
                                     <th>Itens (Cardápio)</th>
+                                    <th>Observação</th>
                                     <th>Valor Total</th>
                                     <th>Pagamento</th>
                                     <th>Registrado em</th>
@@ -223,10 +235,31 @@ try {
                                 <?php foreach ($pedidos as $pedido): ?>
                                     <tr>
                                         <td>#<?php echo (int) $pedido['numero_do_dia']; ?></td>
-                                        <td><strong>Mesa <?php echo (int) $pedido['mesa_numero']; ?></strong></td>
+                                        <td><strong><?php echo htmlspecialchars(Pedidos::textoTipoEntrega((string) ($pedido['tipo_entrega'] ?? Pedidos::TIPO_MESA))); ?></strong></td>
+                                        <td><strong><?php echo (($pedido['tipo_entrega'] ?? Pedidos::TIPO_MESA) === Pedidos::TIPO_MESA) ? 'Mesa ' . (int) $pedido['mesa_numero'] : (($pedido['tipo_entrega'] ?? '') === Pedidos::TIPO_VIAGEM ? 'Retirada' : 'Entrega'); ?></strong></td>
                                         
                                         <!-- Renderiza os pratos oficiais inseridos via cardapio.php -->
                                         <td><?php echo htmlspecialchars($pedido['itens'] ?: 'Pedido sem itens'); ?></td>
+                                        <td><?php 
+                                            $dadosEntrega = array_filter([
+                                                $pedido['cliente_nome'] ?? '',
+                                                $pedido['endereco_entrega'] ?? '',
+                                                $pedido['numero_endereco'] ?? '',
+                                                $pedido['bairro_endereco'] ?? '',
+                                                trim((($pedido['cidade_endereco'] ?? '') . (isset($pedido['uf_endereco']) && $pedido['uf_endereco'] !== '' ? '/' . $pedido['uf_endereco'] : ''))),
+                                                !empty($pedido['cep_entrega']) ? 'CEP ' . $pedido['cep_entrega'] : ''
+                                            ], static fn($valor) => trim((string) $valor) !== '');
+
+                                            $textoObservacao = (($pedido['tipo_entrega'] ?? '') === Pedidos::TIPO_ENTREGA)
+                                                ? (count($dadosEntrega) > 0 ? implode(' • ', $dadosEntrega) : 'Sem endereço')
+                                                : ($pedido['observacao'] ?: 'Sem observações');
+
+                                            if (($pedido['tipo_entrega'] ?? '') === Pedidos::TIPO_ENTREGA && !empty($pedido['observacao'])) {
+                                                $textoObservacao .= ' | Obs: ' . $pedido['observacao'];
+                                            }
+
+                                            echo htmlspecialchars($textoObservacao ?: 'Sem observações');
+                                        ?></td>
                                         
                                         <td>R$ <?php echo number_format((float) $pedido['valor'], 2, ',', '.'); ?></td>
                                         <td>

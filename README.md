@@ -14,6 +14,7 @@ O sistema é dividido por perfis de acesso, garantindo segurança e organizaçã
 * **Cozinha:** Painel em tempo real para controle da fila de preparo (Aguardando / Pronto).
 * **Caixa (Recepção):** Visão geral das comandas, fechamento de contas e recebimentos.
 * **Administração:** Gestão completa de usuários, controle do cardápio e acesso a logs de auditoria.
+* **Gerente:** Gestão completa do restaurante, tirando as funções de administrador.
 
 ## 🛠️ Tecnologias Utilizadas
 

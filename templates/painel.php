@@ -4,6 +4,7 @@
 // =============================================================
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Pedidos.php';
+require_once __DIR__ . '/../src/Cardapio.php';
 require_once __DIR__ . '/../config/conexao.php';
 
 // A recepção é encaminhada ao caixa; os demais perfis podem abrir o painel.
@@ -12,8 +13,7 @@ Auth::requirePainel();
 
 $mensagem = '';
 $tipoMensagem = '';
-// Apenas perfis que podem consultar pedidos visualizam o total financeiro do dia.
-$mostrarResumoPedidos = Auth::isAdmin() || Auth::isGerente() || Auth::isRecepcao();
+$limiteMesas = Pedidos::LIMITE_MESAS;
 
 try {
     // A ação de manutenção da equipe no painel não permite editar e-mails.
@@ -22,17 +22,86 @@ try {
     $usuarios = $conn->query('SELECT id, username, email, is_active FROM users_login ORDER BY username')->fetchAll(PDO::FETCH_ASSOC);
     $equipe = $conn->query('SELECT COUNT(*) FROM users_login WHERE is_active = 1')->fetchColumn();
 
-    if ($mostrarResumoPedidos) {
-        // Garante a estrutura e soma somente os pedidos já pagos na data atual.
-        Pedidos::garantirTabela($conn);
-        $faturamentoHoje = $conn->query("SELECT COALESCE(SUM(valor), 0) FROM pedidos WHERE DATE(criado_em) = CURDATE() AND status_pagamento = 'pago'")->fetchColumn();
-    }
+    Pedidos::garantirTabela($conn);
+    Cardapio::garantirTabelas($conn);
+
+    $stmtMesas = $conn->prepare("SELECT COUNT(DISTINCT mesa_numero)
+        FROM pedidos
+        WHERE DATE(criado_em) = CURDATE()
+          AND tipo_entrega = :tipo_mesa
+          AND status_pagamento = :status_pendente
+          AND mesa_numero BETWEEN 1 AND :limite_mesas");
+    $stmtMesas->bindValue(':tipo_mesa', Pedidos::TIPO_MESA);
+    $stmtMesas->bindValue(':status_pendente', Pedidos::PENDENTE);
+    $stmtMesas->bindValue(':limite_mesas', $limiteMesas, PDO::PARAM_INT);
+    $stmtMesas->execute();
+    $mesasOcupadas = (int) $stmtMesas->fetchColumn();
+    $mesasLivres = max(0, $limiteMesas - $mesasOcupadas);
+
+    $resumoPreparo = $conn->query("SELECT
+            SUM(status_preparo = 'aguardando') AS em_preparo,
+            SUM(status_preparo = 'pronto') AS concluidos
+        FROM pedidos
+        WHERE DATE(criado_em) = CURDATE()")->fetch(PDO::FETCH_ASSOC);
+    $pedidosEmPreparo = (int) ($resumoPreparo['em_preparo'] ?? 0);
+    $pedidosConcluidos = (int) ($resumoPreparo['concluidos'] ?? 0);
+
+    $faturamentoHoje = (float) $conn->query("SELECT COALESCE(SUM(pi.preco_unitario * pi.quantidade), 0)
+        FROM pedidos p
+        LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id
+        WHERE DATE(p.criado_em) = CURDATE()
+          AND p.status_pagamento = 'pago'")->fetchColumn();
+
+    $produtosMaisVendidos = $conn->query("SELECT
+            pi.produto_nome,
+            SUM(pi.quantidade) AS quantidade_vendida,
+            SUM(pi.quantidade * pi.preco_unitario) AS total_vendido
+        FROM pedidos p
+        INNER JOIN pedido_itens pi ON pi.pedido_id = p.id
+        WHERE DATE(p.criado_em) = CURDATE()
+          AND p.status_pagamento = 'pago'
+        GROUP BY pi.produto_id, pi.produto_nome
+        ORDER BY quantidade_vendida DESC, total_vendido DESC
+        LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
+
+    $relatorioVendas = $conn->query("SELECT
+            p.id,
+            p.criado_em,
+            p.tipo_entrega,
+            p.mesa_numero,
+            p.forma_pagamento,
+            p.status_preparo,
+            COALESCE(SUM(pi.preco_unitario * pi.quantidade), 0) AS total,
+            COALESCE(SUM(pi.quantidade), 0) AS itens
+        FROM pedidos p
+        LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id
+        WHERE DATE(p.criado_em) = CURDATE()
+          AND p.status_pagamento = 'pago'
+        GROUP BY p.id, p.criado_em, p.tipo_entrega, p.mesa_numero, p.forma_pagamento, p.status_preparo
+        ORDER BY p.criado_em DESC, p.id DESC")->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (RuntimeException $e) {
     $mensagem = $e->getMessage(); $tipoMensagem = 'erro';
-    $usuarios = $usuarios ?? []; $equipe = $equipe ?? 0; $faturamentoHoje = $faturamentoHoje ?? 0;
+    $usuarios = $usuarios ?? [];
+    $equipe = $equipe ?? 0;
+    $mesasOcupadas = $mesasOcupadas ?? 0;
+    $mesasLivres = $mesasLivres ?? $limiteMesas;
+    $pedidosEmPreparo = $pedidosEmPreparo ?? 0;
+    $pedidosConcluidos = $pedidosConcluidos ?? 0;
+    $faturamentoHoje = $faturamentoHoje ?? 0;
+    $produtosMaisVendidos = $produtosMaisVendidos ?? [];
+    $relatorioVendas = $relatorioVendas ?? [];
 } catch (PDOException $e) {
     $mensagem = 'Não foi possível carregar os dados do painel.'; $tipoMensagem = 'erro';
-    $usuarios = []; $equipe = 0; $faturamentoHoje = 0;
+    $usuarios = [];
+    $equipe = 0;
+    $mesasOcupadas = 0;
+    $mesasLivres = $limiteMesas;
+    $pedidosEmPreparo = 0;
+    $pedidosConcluidos = 0;
+    $faturamentoHoje = 0;
+    $produtosMaisVendidos = [];
+    $relatorioVendas = [];
 }
 ?>
 <!DOCTYPE html>
@@ -72,15 +141,90 @@ try {
             <div class="alerta <?php echo $tipoMensagem; ?>"><?php echo htmlspecialchars($mensagem); ?></div>
         <?php endif; ?>
 
-        <!-- Indicadores rápidos. O valor financeiro não aparece para funcionário comum. -->
-        <section class="cards <?php echo $mostrarResumoPedidos ? '' : 'cards-uma'; ?>" aria-label="Resumo do dia">
-            <?php if ($mostrarResumoPedidos): ?>
-                <article class="card"><span class="icone">💰</span><div><p>Valor pago hoje</p><strong>R$ <?php echo number_format((float) ($faturamentoHoje ?? 0), 2, ',', '.'); ?></strong></div></article>
-            <?php endif; ?>
-            <article class="card"><span class="icone">👥</span><div><p>Pessoas trabalhando</p><strong><?php echo (int)$equipe; ?></strong></div></article>
+        <section class="cards cards-gerencial" aria-label="Indicadores operacionais do dia">
+            <article class="card"><span class="icone">🪑</span><div><p>Mesas ocupadas</p><strong><?php echo (int) $mesasOcupadas; ?></strong></div></article>
+            <article class="card"><span class="icone">✨</span><div><p>Mesas livres</p><strong><?php echo (int) $mesasLivres; ?></strong></div></article>
+            <article class="card"><span class="icone">👨‍🍳</span><div><p>Pedidos em preparo</p><strong><?php echo (int) $pedidosEmPreparo; ?></strong></div></article>
+            <article class="card"><span class="icone">✅</span><div><p>Pedidos concluídos</p><strong><?php echo (int) $pedidosConcluidos; ?></strong></div></article>
+            <article class="card"><span class="icone">💰</span><div><p>Faturamento do dia</p><strong>R$ <?php echo number_format((float) $faturamentoHoje, 2, ',', '.'); ?></strong></div></article>
+            <article class="card"><span class="icone">👥</span><div><p>Pessoas trabalhando</p><strong><?php echo (int) $equipe; ?></strong></div></article>
         </section>
 
-        <!-- Lista de equipe e edição de e-mail. -->
+        <section class="grade painel-relatorios">
+            <article class="bloco usuarios">
+                <div class="titulo-bloco"><div><p class="etiqueta">VENDAS</p><h2>Produtos mais vendidos hoje</h2></div><span>Top 5</span></div>
+                <?php if (!$produtosMaisVendidos): ?>
+                    <p class="vazio">Nenhuma venda paga registrada hoje.</p>
+                <?php else: ?>
+                    <div class="tabela-wrap">
+                        <table class="tabela">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Qtd.</th>
+                                    <th>Total vendido</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($produtosMaisVendidos as $produto): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars((string) ($produto['produto_nome'] ?? 'Produto')); ?></td>
+                                        <td><?php echo (int) ($produto['quantidade_vendida'] ?? 0); ?></td>
+                                        <td>R$ <?php echo number_format((float) ($produto['total_vendido'] ?? 0), 2, ',', '.'); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </article>
+
+            <article class="bloco usuarios">
+                <div class="titulo-bloco"><div><p class="etiqueta">RELATÓRIO</p><h2>Vendas de hoje</h2></div><span><?php echo count($relatorioVendas); ?> pedidos pagos</span></div>
+                <?php if (!$relatorioVendas): ?>
+                    <p class="vazio">Nenhuma venda concluída hoje.</p>
+                <?php else: ?>
+                    <div class="tabela-wrap">
+                        <table class="tabela">
+                            <thead>
+                                <tr>
+                                    <th>Pedido</th>
+                                    <th>Horário</th>
+                                    <th>Origem</th>
+                                    <th>Forma</th>
+                                    <th>Itens</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($relatorioVendas as $venda): ?>
+                                    <tr>
+                                        <td>#<?php echo (int) ($venda['id'] ?? 0); ?></td>
+                                        <td><?php echo htmlspecialchars(date('H:i', strtotime((string) ($venda['criado_em'] ?? 'now')))); ?></td>
+                                        <td>
+                                            <?php
+                                                $tipo = (string) ($venda['tipo_entrega'] ?? Pedidos::TIPO_MESA);
+                                                if ($tipo === Pedidos::TIPO_MESA) {
+                                                    echo 'Mesa ' . (int) ($venda['mesa_numero'] ?? 0);
+                                                } elseif ($tipo === Pedidos::TIPO_VIAGEM) {
+                                                    echo 'Retirada';
+                                                } else {
+                                                    echo 'Entrega';
+                                                }
+                                            ?>
+                                        </td>
+                                        <td><?php echo htmlspecialchars(Pedidos::textoFormaPagamento((string) ($venda['forma_pagamento'] ?? null))); ?></td>
+                                        <td><?php echo (int) ($venda['itens'] ?? 0); ?></td>
+                                        <td>R$ <?php echo number_format((float) ($venda['total'] ?? 0), 2, ',', '.'); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </article>
+        </section>
+
         <section class="grade">
             <article class="bloco usuarios">
                 <div class="titulo-bloco"><div><p class="etiqueta">EQUIPE</p><h2>Usuários cadastrados</h2></div><span><?php echo count($usuarios); ?> usuários</span></div>
@@ -94,7 +238,6 @@ try {
                     <?php endforeach; ?>
                 </div>
             </article>
-
         </section>
     </main>
 </body>

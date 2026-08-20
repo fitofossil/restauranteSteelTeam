@@ -11,6 +11,80 @@ require_once __DIR__ . '/../src/Cardapio.php';
 require_once __DIR__ . '/../src/Log.php';
 require_once __DIR__ . '/../config/conexao.php';
 
+function pixCampoEmv(string $id, string $valor): string
+{
+    return $id . str_pad((string) strlen($valor), 2, '0', STR_PAD_LEFT) . $valor;
+}
+
+function pixNormalizarTexto(string $texto, int $limite): string
+{
+    $texto = trim($texto);
+    $texto = function_exists('mb_strtoupper') ? mb_strtoupper($texto, 'UTF-8') : strtoupper($texto);
+
+    $semAcentos = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texto);
+    if ($semAcentos !== false) {
+        $texto = $semAcentos;
+    }
+
+    $texto = preg_replace('/[^A-Z0-9 .,\-\/]/', '', $texto) ?? '';
+    $texto = preg_replace('/\s+/', ' ', $texto) ?? '';
+
+    return substr(trim($texto), 0, $limite);
+}
+
+function pixCrc16(string $payload): string
+{
+    $polinomio = 0x1021;
+    $resultado = 0xFFFF;
+
+    for ($i = 0, $len = strlen($payload); $i < $len; $i++) {
+        $resultado ^= (ord($payload[$i]) << 8);
+        for ($bit = 0; $bit < 8; $bit++) {
+            if (($resultado & 0x8000) !== 0) {
+                $resultado = (($resultado << 1) ^ $polinomio) & 0xFFFF;
+            } else {
+                $resultado = ($resultado << 1) & 0xFFFF;
+            }
+        }
+    }
+
+    return strtoupper(str_pad(dechex($resultado), 4, '0', STR_PAD_LEFT));
+}
+
+function gerarPayloadPix(string $chave, float $valor, string $nomeRecebedor, string $cidadeRecebedor, string $txid, string $descricao = ''): string
+{
+    $chave = trim($chave);
+    if ($chave === '' || $valor <= 0) {
+        return '';
+    }
+
+    $nomeRecebedor = pixNormalizarTexto($nomeRecebedor, 25);
+    $cidadeRecebedor = pixNormalizarTexto($cidadeRecebedor, 15);
+    $descricao = pixNormalizarTexto($descricao, 40);
+    $txid = pixNormalizarTexto($txid, 25);
+
+    $contaPix = pixCampoEmv('00', 'br.gov.bcb.pix') . pixCampoEmv('01', $chave);
+    if ($descricao !== '') {
+        $contaPix .= pixCampoEmv('02', $descricao);
+    }
+
+    $adicional = pixCampoEmv('05', $txid !== '' ? $txid : '***');
+
+    $payloadSemCrc = '';
+    $payloadSemCrc .= pixCampoEmv('00', '01');
+    $payloadSemCrc .= pixCampoEmv('26', $contaPix);
+    $payloadSemCrc .= pixCampoEmv('52', '0000');
+    $payloadSemCrc .= pixCampoEmv('53', '986');
+    $payloadSemCrc .= pixCampoEmv('54', number_format($valor, 2, '.', ''));
+    $payloadSemCrc .= pixCampoEmv('58', 'BR');
+    $payloadSemCrc .= pixCampoEmv('59', $nomeRecebedor !== '' ? $nomeRecebedor : 'DOGAO LANCHES');
+    $payloadSemCrc .= pixCampoEmv('60', $cidadeRecebedor !== '' ? $cidadeRecebedor : 'SAO PAULO');
+    $payloadSemCrc .= pixCampoEmv('62', $adicional);
+    $payloadSemCrc .= '6304';
+
+    return $payloadSemCrc . pixCrc16($payloadSemCrc);
+}
+
 // Inicialização e segurança da sessão
 Auth::iniciarSessao();
 Auth::requirePedidosView();
@@ -20,6 +94,11 @@ $mensagem = '';
 $tipoMensagem = '';
 $podeEditar = Auth::isRecepcao() || Auth::isAdmin() || Auth::isGerente();
 $podeZerarDia = Auth::isAdmin() || Auth::isGerente();
+$pixPedidoSelecionadoId = filter_input(INPUT_GET, 'pix_pedido_id', FILTER_VALIDATE_INT);
+$pixPayload = '';
+$pixQrCodeUrl = '';
+$pixErro = '';
+$pixAviso = '';
 
 try {
     // Garante que a estrutura física de tabelas está pronta no banco
@@ -56,14 +135,15 @@ try {
             
             $mensagem = $removidos . ' pedido(s) de hoje foram removidos e o dia foi zerado.';
             $tipoMensagem = 'sucesso';
-        } 
-        
+        }
+
         // AÇÃO: Marcar Pedido como Pago ou Pendente (função exclusiva do caixa)
         else {
             Auth::requireEditarPedidos();
 
             $id = filter_input(INPUT_POST, 'pedido_id', FILTER_VALIDATE_INT);
             $status = $_POST['status_pagamento'] ?? '';
+            $formaPagamento = $_POST['forma_pagamento'] ?? null;
 
             if (!$id) {
                 throw new RuntimeException('Pedido inválido.');
@@ -72,16 +152,60 @@ try {
                 throw new RuntimeException('Selecione um status de pagamento válido.');
             }
 
-            $stmt = $conn->prepare('UPDATE pedidos SET status_pagamento = :status WHERE id = :id');
-            $stmt->execute([':status' => $status, ':id' => $id]);
+            if ($status === Pedidos::PAGO && !in_array($formaPagamento, Pedidos::formasPagamentoValidas(), true)) {
+                throw new RuntimeException('Selecione a forma de pagamento para finalizar a venda.');
+            }
 
-            if ($stmt->rowCount() === 0) {
+            if ($status === Pedidos::PENDENTE) {
+                $formaPagamento = null;
+            }
+
+            $stmtPedido = $conn->prepare('SELECT id, mesa_numero, tipo_entrega, criado_em FROM pedidos WHERE id = :id LIMIT 1');
+            $stmtPedido->execute([':id' => $id]);
+            $pedidoBase = $stmtPedido->fetch(PDO::FETCH_ASSOC);
+
+            if (!$pedidoBase) {
                 throw new RuntimeException('Pedido não encontrado.');
             }
 
-            Log::registrar($conn, 'update', 'pedidos', $id, "Pagamento do pedido #$id marcado como '$status'.");
-            $mensagem = $status === Pedidos::PAGO ? 'Pedido marcado como pago.' : 'Pedido marcado como ainda não pago.';
-            $tipoMensagem = 'sucesso';
+            if ($status === Pedidos::PAGO && ($pedidoBase['tipo_entrega'] ?? '') === Pedidos::TIPO_MESA) {
+                $mesaNumero = (int) ($pedidoBase['mesa_numero'] ?? 0);
+                $dataPedido = date('Y-m-d', strtotime((string) $pedidoBase['criado_em']));
+
+                $stmt = $conn->prepare("UPDATE pedidos
+                    SET status_pagamento = :status, forma_pagamento = :forma_pagamento
+                    WHERE tipo_entrega = :tipo_mesa
+                      AND mesa_numero = :mesa
+                      AND status_pagamento = :pendente
+                      AND DATE(criado_em) = :data_pedido");
+                $stmt->execute([
+                    ':status' => $status,
+                    ':forma_pagamento' => $formaPagamento,
+                    ':tipo_mesa' => Pedidos::TIPO_MESA,
+                    ':mesa' => $mesaNumero,
+                    ':pendente' => Pedidos::PENDENTE,
+                    ':data_pedido' => $dataPedido,
+                ]);
+
+                if ($stmt->rowCount() === 0) {
+                    throw new RuntimeException('Não há pedidos pendentes nessa mesa para encerrar.');
+                }
+
+                Log::registrar($conn, 'update', 'pedidos', $id, "Mesa #$mesaNumero encerrada ao marcar o pedido #$id como pago.");
+                $mensagem = "Pedido pago e mesa $mesaNumero encerrada automaticamente.";
+                $tipoMensagem = 'sucesso';
+            } else {
+                $stmt = $conn->prepare('UPDATE pedidos SET status_pagamento = :status, forma_pagamento = :forma_pagamento WHERE id = :id');
+                $stmt->execute([':status' => $status, ':forma_pagamento' => $formaPagamento, ':id' => $id]);
+
+                if ($stmt->rowCount() === 0) {
+                    throw new RuntimeException('Pedido não encontrado.');
+                }
+
+                Log::registrar($conn, 'update', 'pedidos', $id, "Pagamento do pedido #$id marcado como '$status'.");
+                $mensagem = $status === Pedidos::PAGO ? 'Pedido marcado como pago.' : 'Pedido marcado como ainda não pago.';
+                $tipoMensagem = 'sucesso';
+            }
         }
     }
 
@@ -92,6 +216,7 @@ try {
         SELECT p.id, 
                p.mesa_numero, 
                p.status_pagamento,
+               p.forma_pagamento,
                p.tipo_entrega,
                p.observacao,
                p.cliente_nome,
@@ -108,7 +233,7 @@ try {
         FROM pedidos p 
         LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id
         LEFT JOIN produtos pr ON pr.id = pi.produto_id
-        GROUP BY p.id, p.mesa_numero, p.status_pagamento, p.tipo_entrega, p.observacao, p.cliente_nome, p.cep_entrega, p.endereco_entrega, p.numero_endereco, p.complemento_endereco, p.bairro_endereco, p.cidade_endereco, p.uf_endereco, p.criado_em
+        GROUP BY p.id, p.mesa_numero, p.status_pagamento, p.forma_pagamento, p.tipo_entrega, p.observacao, p.cliente_nome, p.cep_entrega, p.endereco_entrega, p.numero_endereco, p.complemento_endereco, p.bairro_endereco, p.cidade_endereco, p.uf_endereco, p.criado_em
         ORDER BY p.criado_em ASC, p.id ASC
     ";
     
@@ -125,6 +250,45 @@ try {
 
     // Inverte o array para exibir os pedidos mais recentes sempre no topo da tela
     $pedidos = array_reverse($pedidosOrdenados);
+
+    if ($pixPedidoSelecionadoId) {
+        $pedidoPix = null;
+        foreach ($pedidosOrdenados as $pedidoAtual) {
+            if ((int) $pedidoAtual['id'] === (int) $pixPedidoSelecionadoId) {
+                $pedidoPix = $pedidoAtual;
+                break;
+            }
+        }
+
+        if (!$pedidoPix) {
+            $pixErro = 'Pedido selecionado para PIX não foi encontrado.';
+        } else {
+            $valorPix = (float) ($pedidoPix['valor'] ?? 0);
+            if ($valorPix <= 0) {
+                $pixErro = 'Este pedido não possui valor para gerar o PIX.';
+            } else {
+                $pixChave = trim((string) (getenv('PIX_CHAVE') ?: (defined('PIX_CHAVE') ? PIX_CHAVE : '')));
+                $pixNome = trim((string) (getenv('PIX_NOME_RECEBEDOR') ?: 'DOGAO LANCHES'));
+                $pixCidade = trim((string) (getenv('PIX_CIDADE_RECEBEDOR') ?: 'SAO PAULO'));
+
+                if ($pixChave === '') {
+                    $pixPayload = 'PIX-SIMULADO|PEDIDO:' . (int) $pedidoPix['id'] . '|VALOR:' . number_format($valorPix, 2, '.', '') . '|GERADO:' . date('YmdHis');
+                    $pixQrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=' . rawurlencode($pixPayload);
+                    $pixAviso = 'Modo de simulação ativo: QR Code apenas para demonstração (não realiza cobrança real).';
+                } else {
+                    $txid = 'PD' . (int) $pedidoPix['id'] . date('His');
+                    $descricao = 'Pedido #' . (int) $pedidoPix['id'];
+                    $pixPayload = gerarPayloadPix($pixChave, $valorPix, $pixNome, $pixCidade, $txid, $descricao);
+
+                    if ($pixPayload === '') {
+                        $pixErro = 'Não foi possível montar o código PIX deste pedido.';
+                    } else {
+                        $pixQrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=' . rawurlencode($pixPayload);
+                    }
+                }
+            }
+        }
+    }
 
     // Consolidação financeira do caixa de hoje com base no preço histórico calculado
     $queryResumo = "
@@ -200,6 +364,36 @@ try {
             </article>
         </section>
 
+        <?php if ($pixPedidoSelecionadoId): ?>
+            <section class="bloco pix-qr-bloco" aria-label="QR Code para pagamento PIX">
+                <div class="titulo-bloco">
+                    <div>
+                        <p class="etiqueta">PAGAMENTO PIX</p>
+                        <h2>Cobrança do pedido #<?php echo (int) $pixPedidoSelecionadoId; ?></h2>
+                    </div>
+                    <a class="btn-topo" href="pedidos.php">Fechar QR</a>
+                </div>
+
+                <?php if ($pixErro !== ''): ?>
+                    <div class="alerta erro"><?php echo htmlspecialchars($pixErro); ?></div>
+                <?php else: ?>
+                    <?php if ($pixAviso !== ''): ?>
+                        <div class="alerta"><?php echo htmlspecialchars($pixAviso); ?></div>
+                    <?php endif; ?>
+                    <div class="pix-qr-grid">
+                        <div>
+                            <img class="pix-qr-imagem" src="<?php echo htmlspecialchars($pixQrCodeUrl); ?>" alt="QR Code PIX do pedido <?php echo (int) $pixPedidoSelecionadoId; ?>">
+                        </div>
+                        <div>
+                            <p class="pix-qr-instrucao">Escaneie no app do banco para pagar.</p>
+                            <label class="pix-copia-label" for="pix-copia-cola">PIX copia e cola</label>
+                            <textarea id="pix-copia-cola" class="pix-copia-cola" readonly><?php echo htmlspecialchars($pixPayload); ?></textarea>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </section>
+        <?php endif; ?>
+
         <!-- Grade de Operações do Caixa -->
         <section class="grade pedidos-grade <?php echo $podeEditar ? '' : 'pedidos-leitura'; ?>">
             
@@ -264,7 +458,7 @@ try {
                                         <td>R$ <?php echo number_format((float) $pedido['valor'], 2, ',', '.'); ?></td>
                                         <td>
                                             <span class="badge pagamento-<?php echo htmlspecialchars($pedido['status_pagamento']); ?>">
-                                                <?php echo $pedido['status_pagamento'] === Pedidos::PAGO ? 'Pago' : 'Ainda não pago'; ?>
+                                                <?php echo $pedido['status_pagamento'] === Pedidos::PAGO ? 'Pago - ' . htmlspecialchars(Pedidos::textoFormaPagamento($pedido['forma_pagamento'] ?? null)) : 'Ainda não pago'; ?>
                                             </span>
                                         </td>
                                         <td><?php echo htmlspecialchars(date('d/m/Y H:i', strtotime($pedido['criado_em']))); ?></td>
@@ -281,8 +475,16 @@ try {
                                                     <form method="POST" class="inline">
                                                         <input type="hidden" name="pedido_id" value="<?php echo (int) $pedido['id']; ?>">
                                                         <input type="hidden" name="status_pagamento" value="pago">
+                                                        <label class="sr-only" for="forma-pagamento-<?php echo (int) $pedido['id']; ?>">Forma de pagamento</label>
+                                                        <select id="forma-pagamento-<?php echo (int) $pedido['id']; ?>" name="forma_pagamento" required>
+                                                            <option value="">Forma de pagamento</option>
+                                                            <option value="dinheiro">Dinheiro</option>
+                                                            <option value="cartao">Cartão</option>
+                                                            <option value="pix">PIX</option>
+                                                        </select>
                                                         <button type="submit" name="marcar_pagamento" class="btn-pronto">Marcar como pago</button>
                                                     </form>
+                                                    <a class="btn-editar btn-pix" href="?pix_pedido_id=<?php echo (int) $pedido['id']; ?>">Gerar QR PIX</a>
                                                 <?php endif; ?>
                                             </td>
                                         <?php endif; ?>

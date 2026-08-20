@@ -5,6 +5,7 @@
 
 class Pedidos
 {
+    public const LIMITE_MESAS = 13;
     public const PENDENTE = 'pendente';
     public const PAGO = 'pago';
     public const AGUARDANDO_PREPARO = 'aguardando';
@@ -21,6 +22,7 @@ class Pedidos
             mesa_numero SMALLINT UNSIGNED NOT NULL,
             valor DECIMAL(10,2) NOT NULL,
             status_pagamento VARCHAR(10) NOT NULL DEFAULT 'pendente',
+            forma_pagamento VARCHAR(20) NULL,
             status_preparo VARCHAR(10) NOT NULL DEFAULT 'aguardando',
             tipo_entrega VARCHAR(20) NOT NULL DEFAULT 'mesa',
             observacao TEXT NULL,
@@ -47,6 +49,10 @@ class Pedidos
 
         if (!self::colunaExiste($conn, 'status_pagamento')) {
             $conn->exec("ALTER TABLE pedidos ADD COLUMN status_pagamento VARCHAR(10) NOT NULL DEFAULT 'pendente' AFTER valor");
+        }
+
+        if (!self::colunaExiste($conn, 'forma_pagamento')) {
+            $conn->exec("ALTER TABLE pedidos ADD COLUMN forma_pagamento VARCHAR(20) NULL AFTER status_pagamento");
         }
 
         if (!self::colunaExiste($conn, 'status_preparo')) {
@@ -80,6 +86,21 @@ class Pedidos
     public static function statusPreparoValidos(): array
     {
         return [self::AGUARDANDO_PREPARO, self::PRONTO];
+    }
+
+    public static function formasPagamentoValidas(): array
+    {
+        return ['dinheiro', 'cartao', 'pix'];
+    }
+
+    public static function textoFormaPagamento(?string $forma): string
+    {
+        return match ($forma) {
+            'dinheiro' => 'Dinheiro',
+            'cartao' => 'Cartão',
+            'pix' => 'PIX',
+            default => 'Não informado',
+        };
     }
 
     public static function tiposEntregaValidos(): array

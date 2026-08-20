@@ -8,6 +8,8 @@ require_once __DIR__ . '/../config/conexao.php';
 Auth::iniciarSessao();
 Auth::requireGarcom();
 
+$limiteMesas = Pedidos::LIMITE_MESAS;
+
 function buscarDadosCep(string $cep): array
 {
     $cep = preg_replace('/\D+/', '', $cep);
@@ -46,6 +48,7 @@ function buscarDadosCep(string $cep): array
 
 $mensagem = '';
 $tipoMensagem = '';
+$pedidoEmEdicaoId = null;
 $tipoPedidoSelecionado = $_POST['tipo_entrega'] ?? Pedidos::TIPO_MESA;
 $clienteNome = trim((string) ($_POST['cliente_nome'] ?? ''));
 $cepEntrega = preg_replace('/\D+/', '', (string) ($_POST['cep_entrega'] ?? ''));
@@ -99,8 +102,8 @@ try {
         }
 
         if ($tipoEntrega === Pedidos::TIPO_MESA) {
-            if (!$mesa || $mesa < 1 || $mesa > 999) {
-                throw new RuntimeException('Informe um número de mesa entre 1 e 999.');
+            if (!$mesa || $mesa < 1 || $mesa > $limiteMesas) {
+                throw new RuntimeException('Informe um número de mesa entre 1 e ' . $limiteMesas . '.');
             }
         } else {
             $mesa = 0;
@@ -175,6 +178,102 @@ try {
         $_POST = [];
     }
 
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['editar_pedido'])) {
+        $pedidoId = filter_input(INPUT_POST, 'pedido_id', FILTER_VALIDATE_INT);
+        $novasQuantidades = $_POST['quantidades_pedido'] ?? [];
+
+        if (!$pedidoId) {
+            throw new RuntimeException('Pedido inválido para alteração.');
+        }
+
+        if (!is_array($novasQuantidades)) {
+            throw new RuntimeException('As quantidades informadas são inválidas.');
+        }
+
+        $quantidadesValidas = [];
+        foreach ($novasQuantidades as $produtoId => $quantidade) {
+            $produtoIdValidado = filter_var($produtoId, FILTER_VALIDATE_INT);
+            $quantidadeValidada = filter_var($quantidade, FILTER_VALIDATE_INT);
+            if ($produtoIdValidado && $quantidadeValidada !== false && $quantidadeValidada >= 0 && $quantidadeValidada <= 99) {
+                $quantidadesValidas[$produtoIdValidado] = (int) $quantidadeValidada;
+            }
+        }
+
+        if (!$quantidadesValidas) {
+            throw new RuntimeException('Informe pelo menos uma quantidade para ajustar o pedido.');
+        }
+
+        $conn->beginTransaction();
+        $stmtItens = $conn->prepare('SELECT id, produto_id, produto_nome, quantidade, preco_unitario FROM pedido_itens WHERE pedido_id = ? ORDER BY id');
+        $stmtItens->execute([$pedidoId]);
+        $itensPedido = $stmtItens->fetchAll(PDO::FETCH_ASSOC);
+
+        $itensAtuais = [];
+        foreach ($itensPedido as $item) {
+            $itensAtuais[(int) $item['produto_id']] = $item;
+        }
+
+        $totalAtualizado = 0;
+        $temItemNoPedido = false;
+        foreach ($quantidadesValidas as $produtoId => $quantidade) {
+            if ($quantidade === 0) {
+                if (isset($itensAtuais[$produtoId])) {
+                    $deleteItem = $conn->prepare('DELETE FROM pedido_itens WHERE id = ?');
+                    $deleteItem->execute([$itensAtuais[$produtoId]['id']]);
+                }
+                continue;
+            }
+
+            $produto = $conn->prepare('SELECT id, nome, preco FROM produtos WHERE id = ? AND ativo = 1 LIMIT 1');
+            $produto->execute([$produtoId]);
+            $produtoAtual = $produto->fetch(PDO::FETCH_ASSOC);
+
+            if (!$produtoAtual) {
+                throw new RuntimeException('Um prato selecionado não está mais disponível.');
+            }
+
+            $temItemNoPedido = true;
+            $totalAtualizado += (float) $produtoAtual['preco'] * $quantidade;
+
+            if (isset($itensAtuais[$produtoId])) {
+                $updateItem = $conn->prepare('UPDATE pedido_itens SET produto_nome = ?, quantidade = ?, preco_unitario = ? WHERE id = ?');
+                $updateItem->execute([$produtoAtual['nome'], $quantidade, $produtoAtual['preco'], $itensAtuais[$produtoId]['id']]);
+            } else {
+                $insertItem = $conn->prepare('INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade, preco_unitario) VALUES (?, ?, ?, ?, ?)');
+                $insertItem->execute([$pedidoId, $produtoAtual['id'], $produtoAtual['nome'], $quantidade, $produtoAtual['preco']]);
+            }
+        }
+
+        foreach ($itensPedido as $item) {
+            $produtoId = (int) $item['produto_id'];
+            if (!isset($quantidadesValidas[$produtoId])) {
+                $deleteItem = $conn->prepare('DELETE FROM pedido_itens WHERE id = ?');
+                $deleteItem->execute([$item['id']]);
+            }
+        }
+
+        if (!$temItemNoPedido) {
+            $removerPedido = $conn->prepare('DELETE FROM pedidos WHERE id = ?');
+            $removerPedido->execute([$pedidoId]);
+            $conn->commit();
+
+            Log::registrar($conn, 'delete', 'pedidos', $pedidoId, "Pedido #$pedidoId removido pelo garçom após exclusão de todos os itens.");
+            $mensagem = 'Todos os itens foram removidos e o pedido foi excluído.';
+        } else {
+            $updatePedido = $conn->prepare('UPDATE pedidos SET valor = ? WHERE id = ?');
+            $updatePedido->execute([$totalAtualizado, $pedidoId]);
+            $conn->commit();
+
+            Log::registrar($conn, 'update', 'pedido_itens', $pedidoId, "Quantidades do pedido #$pedidoId ajustadas pelo garçom.");
+            $mensagem = 'Quantidade do pedido ajustada com sucesso.';
+        }
+
+        $tipoMensagem = 'sucesso';
+        $pedidoEmEdicaoId = null;
+    } elseif (isset($_POST['abrir_edicao'])) {
+        $pedidoEmEdicaoId = filter_input(INPUT_POST, 'pedido_id', FILTER_VALIDATE_INT) ?: null;
+    }
+
     $produtosCardapio = $conn->query('SELECT id, nome, descricao, preco FROM produtos WHERE ativo = 1 ORDER BY nome')->fetchAll(PDO::FETCH_ASSOC);
     $pedidos = $conn->query("SELECT p.id, p.mesa_numero, p.valor, p.status_pagamento, p.status_preparo, p.tipo_entrega, p.observacao, p.cliente_nome, p.cep_entrega, p.endereco_entrega, p.numero_endereco, p.complemento_endereco, p.bairro_endereco, p.cidade_endereco, p.uf_endereco, p.criado_em,
                                     GROUP_CONCAT(CONCAT(pi.quantidade, 'x ', pi.produto_nome) ORDER BY pi.id SEPARATOR ' • ') AS itens
@@ -182,6 +281,45 @@ try {
                              WHERE DATE(p.criado_em) = CURDATE()
                              GROUP BY p.id, p.mesa_numero, p.valor, p.status_pagamento, p.status_preparo, p.tipo_entrega, p.observacao, p.cliente_nome, p.cep_entrega, p.endereco_entrega, p.numero_endereco, p.complemento_endereco, p.bairro_endereco, p.cidade_endereco, p.uf_endereco, p.criado_em
                              ORDER BY p.criado_em DESC, p.id DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+    $mesasStatus = [];
+    for ($numeroMesa = 1; $numeroMesa <= $limiteMesas; $numeroMesa++) {
+        $mesasStatus[$numeroMesa] = [
+            'numero' => $numeroMesa,
+            'ocupada' => false,
+            'pedido_id' => null,
+        ];
+    }
+
+    foreach ($pedidos as $pedidoAtual) {
+        if (($pedidoAtual['tipo_entrega'] ?? '') !== Pedidos::TIPO_MESA) {
+            continue;
+        }
+
+        $numeroMesa = (int) ($pedidoAtual['mesa_numero'] ?? 0);
+        if ($numeroMesa < 1 || $numeroMesa > $limiteMesas) {
+            continue;
+        }
+
+        if (($pedidoAtual['status_pagamento'] ?? '') === Pedidos::PENDENTE) {
+            $mesasStatus[$numeroMesa]['ocupada'] = true;
+            $mesasStatus[$numeroMesa]['pedido_id'] = (int) $pedidoAtual['id'];
+        }
+    }
+
+    $mesasOcupadas = count(array_filter($mesasStatus, static fn($mesa) => $mesa['ocupada']));
+    $mesasLivres = $limiteMesas - $mesasOcupadas;
+
+    $pedidoSelecionadoParaEdicao = null;
+    if ($pedidoEmEdicaoId) {
+        $stmtPedidoEdicao = $conn->prepare('SELECT p.id, p.mesa_numero, p.tipo_entrega, p.observacao, p.valor, pi.id AS item_id, pi.produto_id, pi.produto_nome, pi.quantidade, pi.preco_unitario
+            FROM pedidos p
+            LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id
+            WHERE p.id = ?
+            ORDER BY pi.id');
+        $stmtPedidoEdicao->execute([$pedidoEmEdicaoId]);
+        $pedidoSelecionadoParaEdicao = $stmtPedidoEdicao->fetchAll(PDO::FETCH_ASSOC);
+    }
 } catch (RuntimeException $e) {
     if ($conn->inTransaction()) {
         $conn->rollBack();
@@ -190,6 +328,9 @@ try {
     $tipoMensagem = 'erro';
     $produtosCardapio = $produtosCardapio ?? [];
     $pedidos = $pedidos ?? [];
+    $mesasStatus = $mesasStatus ?? [];
+    $mesasOcupadas = $mesasOcupadas ?? 0;
+    $mesasLivres = $mesasLivres ?? $limiteMesas;
 } catch (PDOException $e) {
     if ($conn->inTransaction()) {
         $conn->rollBack();
@@ -198,6 +339,9 @@ try {
     $tipoMensagem = 'erro';
     $produtosCardapio = [];
     $pedidos = [];
+    $mesasStatus = [];
+    $mesasOcupadas = 0;
+    $mesasLivres = $limiteMesas;
 }
 ?>
 <!DOCTYPE html>
@@ -227,6 +371,27 @@ try {
         <?php if ($mensagem): ?>
             <div class="alerta <?php echo $tipoMensagem; ?>"><?php echo htmlspecialchars($mensagem); ?></div>
         <?php endif; ?>
+
+        <section class="bloco mesas-painel" aria-label="Status das mesas">
+            <div class="titulo-bloco">
+                <div>
+                    <h2>Mesas do salão (1 a <?php echo (int) $limiteMesas; ?>)</h2>
+                </div>
+                <span><?php echo (int) $mesasLivres; ?> livres • <?php echo (int) $mesasOcupadas; ?> ocupadas</span>
+            </div>
+
+            <div class="mesas-grid">
+                <?php foreach ($mesasStatus as $mesa): ?>
+                    <article class="mesa-card <?php echo $mesa['ocupada'] ? 'mesa-ocupada' : 'mesa-livre'; ?>">
+                        <strong>Mesa <?php echo (int) $mesa['numero']; ?></strong>
+                        <span><?php echo $mesa['ocupada'] ? 'Ocupada' : 'Livre'; ?></span>
+                        <?php if ($mesa['ocupada'] && $mesa['pedido_id']): ?>
+                            <small>Pedido #<?php echo (int) $mesa['pedido_id']; ?></small>
+                        <?php endif; ?>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        </section>
 
         <section class="grade garcom-grade">
             <article class="bloco lista">
@@ -287,10 +452,40 @@ try {
                                         <td>R$ <?php echo number_format((float) $pedido['valor'], 2, ',', '.'); ?></td>
                                         <td><span class="badge pagamento-<?php echo htmlspecialchars($pedido['status_pagamento']); ?>"><?php echo $pedido['status_pagamento'] === Pedidos::PAGO ? 'Pago' : 'Pendente'; ?></span></td>
                                         <td><span class="badge preparo-<?php echo $pronto ? 'pronto' : 'aguardando'; ?>"><?php echo $pronto ? 'Pronto' : 'Em preparo'; ?></span></td>
+                                        <td>
+                                            <form method="POST" class="inline">
+                                                <input type="hidden" name="pedido_id" value="<?php echo (int) $pedido['id']; ?>">
+                                                <button type="submit" name="abrir_edicao" class="btn-topo">Ajustar</button>
+                                            </form>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($pedidoSelecionadoParaEdicao && !empty($pedidoSelecionadoParaEdicao)): ?>
+                    <div class="formulario-card" style="margin-top: 1.5rem;">
+                        <p class="etiqueta">AJUSTAR QUANTIDADES</p>
+                        <h2>Pedido #<?php echo (int) $pedidoSelecionadoParaEdicao[0]['id']; ?></h2>
+                        <p>Para remover um item, defina a quantidade como 0 e salve.</p>
+                        <form method="POST">
+                            <input type="hidden" name="pedido_id" value="<?php echo (int) $pedidoSelecionadoParaEdicao[0]['id']; ?>">
+                            <?php foreach ($pedidoSelecionadoParaEdicao as $item): ?>
+                                <?php if ($item['produto_id'] === null) continue; ?>
+                                <div class="item-cardapio" style="padding: 0.75rem 0; margin-bottom: 0.5rem; display: block;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                                        <div>
+                                            <strong><?php echo htmlspecialchars($item['produto_nome'] ?: 'Item'); ?></strong>
+                                            <small>Valor unitário: R$ <?php echo number_format((float) ($item['preco_unitario'] ?? 0), 2, ',', '.'); ?></small>
+                                        </div>
+                                        <input type="number" name="quantidades_pedido[<?php echo (int) $item['produto_id']; ?>]" min="0" max="99" value="<?php echo (int) ($item['quantidade'] ?? 0); ?>" aria-label="Quantidade de <?php echo htmlspecialchars($item['produto_nome'] ?: 'item'); ?>" style="width: 80px;">
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                            <button type="submit" name="editar_pedido" class="botao-principal">Salvar quantidade</button>
+                        </form>
                     </div>
                 <?php endif; ?>
             </article>
@@ -320,7 +515,7 @@ try {
                                 <div class="pedido-contexto">
                                     <p class="etiqueta">ATENDIMENTO NA MESA</p>
                                     <label for="mesa_numero">Número da mesa</label>
-                                    <input id="mesa_numero" type="number" name="mesa_numero" min="1" max="999" value="<?php echo htmlspecialchars((string) ($_POST['mesa_numero'] ?? 1)); ?>" required>
+                                    <input id="mesa_numero" type="number" name="mesa_numero" min="1" max="<?php echo (int) $limiteMesas; ?>" value="<?php echo htmlspecialchars((string) ($_POST['mesa_numero'] ?? 1)); ?>" required>
                                 </div>
                             <?php endif; ?>
 
